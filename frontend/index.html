@@ -91,7 +91,15 @@
   .btn-outline-dark:hover { border-color: var(--ink); background: rgba(18,32,26,0.04); }
 
   /* ---------- Hero ---------- */
-  .hero { padding: 76px 28px 44px; max-width: 780px; }
+  .hero { position: relative; padding: 76px 0 44px 28px; width: 100%; overflow: hidden; }
+  .hero-content { position: relative; z-index: 2; max-width: 620px; }
+  .hero-visual {
+    position: absolute; top: 0; right: 0; bottom: 0; width: 58%; min-width: 380px;
+    z-index: 1; pointer-events: none;
+    -webkit-mask-image: linear-gradient(to left, black 30%, transparent 88%);
+    mask-image: linear-gradient(to left, black 30%, transparent 88%);
+  }
+  .hero-visual img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .hero-eyebrow {
     display: inline-flex; align-items: center; gap: 8px; font-family: 'JetBrains Mono', monospace;
     font-size: .74rem; letter-spacing: .12em; color: var(--green-1); background: rgba(23,164,104,0.1);
@@ -318,10 +326,10 @@ function timeAgo(iso) {
 }
 
 let listings = [
-  { id: 1, title: "3 office chairs, minor wear", category: "furniture", qtyLabel: "3 units", qtyNum: 3, condition: "Used - good", location: "Kisumu, Milimani", status: "available", posterName: "Amina O.", accountType: "individual", postedAt: hoursAgo(2), description: "Swivel chairs from a closed workspace. Two need a screw tightened, otherwise solid.", photoUrl: null },
-  { id: 2, title: "Offcut timber, mixed sizes", category: "construction", qtyLabel: "~40kg", qtyNum: 4, condition: "New offcuts", location: "Nairobi, Industrial Area", status: "available", posterName: "Zawadi Works Ltd.", accountType: "organization", postedAt: hoursAgo(5), description: "Leftover from cabinet production. Good for small joinery or a firewood alternative.", photoUrl: null },
-  { id: 3, title: "Broken laptops (for parts)", category: "ewaste", qtyLabel: "6 units", qtyNum: 6, condition: "Non-functional", location: "Kisumu, CBD", status: "claimed", posterName: "Brian K.", accountType: "individual", postedAt: hoursAgo(30), description: "Screens cracked, boards may still work. Good for a repair shop or e-waste recycler.", photoUrl: null },
-  { id: 4, title: "Fabric offcuts, assorted colors", category: "textiles", qtyLabel: "5 bags", qtyNum: 5, condition: "New offcuts", location: "Nairobi, Gikomba", status: "available", posterName: "Cheza Tailors", accountType: "organization", postedAt: hoursAgo(8), description: "Cotton and ankara offcuts from tailoring. Great for patchwork or stuffing.", photoUrl: null },
+  { id: 1, title: "3 office chairs, minor wear", category: "furniture", qtyLabel: "3 units", qtyNum: 3, condition: "Used - good", location: "Kisumu, Milimani", status: "available", posterName: "Amina O.", accountType: "individual", postedAt: hoursAgo(2), description: "Swivel chairs from a closed workspace. Two need a screw tightened, otherwise solid.", photoUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR7D-BCRTSdQfbNWg22b0VSQnZtG7Jn3ECol5nBpkQRgA&s=10" },
+  { id: 2, title: "Offcut timber, mixed sizes", category: "construction", qtyLabel: "~40kg", qtyNum: 4, condition: "New offcuts", location: "Nairobi, Industrial Area", status: "available", posterName: "Zawadi Works Ltd.", accountType: "organization", postedAt: hoursAgo(5), description: "Leftover from cabinet production. Good for small joinery or a firewood alternative.", photoUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT9Rz3jYcg5Qia8Am2p36MQJP1149evIrNEYSMFAxtIlw&s=10" },
+  { id: 3, title: "Broken laptops (for parts)", category: "ewaste", qtyLabel: "6 units", qtyNum: 6, condition: "Non-functional", location: "Kisumu, CBD", status: "claimed", posterName: "Brian K.", accountType: "individual", postedAt: hoursAgo(30), description: "Screens cracked, boards may still work. Good for a repair shop or e-waste recycler.", photoUrl: "" },
+  { id: 4, title: "Fabric offcuts, assorted colors", category: "textiles", qtyLabel: "5 bags", qtyNum: 5, condition: "New offcuts", location: "Nairobi, Gikomba", status: "available", posterName: "Cheza Tailors", accountType: "organization", postedAt: hoursAgo(8), description: "Cotton and ankara offcuts from tailoring. Great for patchwork or stuffing.", photoUrl: "https://www.blackbirdfabrics.com/cdn/shop/articles/Untitled-1_0336d11c-814e-4f77-b609-d07f8a48b265.jpg?v=1682380353&width=4864" },
   { id: 5, title: "Spent coffee grounds, daily", category: "organic", qtyLabel: "10kg / day", qtyNum: 5, condition: "Fresh daily", location: "Kisumu, Milimani", status: "available", posterName: "Java Corner Cafe", accountType: "organization", postedAt: hoursAgo(1), description: "Recurring listing — great for composting or mushroom substrate. Collect daily after 6pm.", photoUrl: null },
   { id: 6, title: "Dining table, one leg wobbly", category: "furniture", qtyLabel: "1 unit", qtyNum: 1, condition: "Used - fair", location: "Kisumu, Nyalenda", status: "collected", posterName: "Grace W.", accountType: "individual", postedAt: hoursAgo(60), description: "Solid wood, just needs a leg brace.", photoUrl: null },
   { id: 7, title: "PET bottle bales", category: "plastic", qtyLabel: "200kg", qtyNum: 20, condition: "Sorted, clean", location: "Nairobi, Industrial Area", status: "available", posterName: "Pack Right Ltd.", accountType: "organization", postedAt: hoursAgo(12), description: "Baled PET from packaging line. Ready for a recycler with pickup capacity.", photoUrl: null },
@@ -390,6 +398,77 @@ function ticketCard(l) {
 /* ============================================================
    Page renderers
 ============================================================ */
+function heroVisualSvg() {
+  // A composition built from the app's own category-tag language (not a stock photo):
+  // stacked "material tag" cards at gentle rotations, a ticket-perforation ring,
+  // and a soft gradient field behind them. Fades to nothing on the left via CSS mask.
+  return `
+  <svg viewBox="0 0 640 720" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="gGreen" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#74F2AE"/>
+        <stop offset="100%" stop-color="#0B7A4C"/>
+      </linearGradient>
+      <linearGradient id="gGreenSoft" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#17A468" stop-opacity="0.9"/>
+        <stop offset="100%" stop-color="#0B7A4C" stop-opacity="0.9"/>
+      </linearGradient>
+      <radialGradient id="gField" cx="65%" cy="35%" r="65%">
+        <stop offset="0%" stop-color="#74F2AE" stop-opacity="0.5"/>
+        <stop offset="100%" stop-color="#74F2AE" stop-opacity="0"/>
+      </radialGradient>
+    </defs>
+
+    <circle cx="440" cy="260" r="330" fill="url(#gField)"/>
+    <circle cx="430" cy="300" r="210" fill="none" stroke="#0B7A4C" stroke-opacity="0.18" stroke-width="2" stroke-dasharray="3 10"/>
+    <circle cx="430" cy="300" r="150" fill="none" stroke="#0B7A4C" stroke-opacity="0.14" stroke-width="2"/>
+
+    <!-- stacked material tags -->
+    <g transform="translate(300,150) rotate(-9)">
+      <rect x="0" y="0" width="150" height="96" rx="18" fill="#ffffff" stroke="#E2DECB" stroke-width="2"/>
+      <rect x="18" y="18" width="34" height="34" rx="9" fill="url(#gGreen)"/>
+      <text x="35" y="41" font-family="JetBrains Mono, monospace" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">FN</text>
+      <rect x="18" y="62" width="90" height="10" rx="5" fill="#E2DECB"/>
+      <rect x="18" y="78" width="60" height="8" rx="4" fill="#EEEBDD"/>
+    </g>
+
+    <g transform="translate(420,270) rotate(6)">
+      <rect x="0" y="0" width="150" height="96" rx="18" fill="#ffffff" stroke="#E2DECB" stroke-width="2"/>
+      <rect x="18" y="18" width="34" height="34" rx="9" fill="#F0AE2E"/>
+      <text x="35" y="41" font-family="JetBrains Mono, monospace" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">EW</text>
+      <rect x="18" y="62" width="90" height="10" rx="5" fill="#E2DECB"/>
+      <rect x="18" y="78" width="70" height="8" rx="4" fill="#EEEBDD"/>
+    </g>
+
+    <g transform="translate(260,340) rotate(4)">
+      <rect x="0" y="0" width="150" height="96" rx="18" fill="url(#gGreenSoft)"/>
+      <rect x="18" y="18" width="34" height="34" rx="9" fill="#ffffff" fill-opacity="0.25"/>
+      <text x="35" y="41" font-family="JetBrains Mono, monospace" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">OR</text>
+      <rect x="18" y="62" width="90" height="10" rx="5" fill="#ffffff" fill-opacity="0.35"/>
+      <rect x="18" y="78" width="55" height="8" rx="4" fill="#ffffff" fill-opacity="0.25"/>
+    </g>
+
+    <g transform="translate(400,450) rotate(-7)">
+      <rect x="0" y="0" width="150" height="96" rx="18" fill="#ffffff" stroke="#E2DECB" stroke-width="2"/>
+      <rect x="18" y="18" width="34" height="34" rx="9" fill="url(#gGreen)"/>
+      <text x="35" y="41" font-family="JetBrains Mono, monospace" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">TX</text>
+      <rect x="18" y="62" width="90" height="10" rx="5" fill="#E2DECB"/>
+      <rect x="18" y="78" width="65" height="8" rx="4" fill="#EEEBDD"/>
+    </g>
+
+    <g transform="translate(300,560) rotate(8)">
+      <rect x="0" y="0" width="150" height="96" rx="18" fill="#ffffff" stroke="#E2DECB" stroke-width="2"/>
+      <rect x="18" y="18" width="34" height="34" rx="9" fill="#F0672C"/>
+      <text x="35" y="41" font-family="JetBrains Mono, monospace" font-size="14" font-weight="700" fill="#ffffff" text-anchor="middle">IN</text>
+      <rect x="18" y="62" width="90" height="10" rx="5" fill="#E2DECB"/>
+      <rect x="18" y="78" width="50" height="8" rx="4" fill="#EEEBDD"/>
+    </g>
+
+    <!-- floating connecting arc, echoing the claim → collect loop -->
+    <path d="M 200 200 Q 60 380 220 560" fill="none" stroke="#0B7A4C" stroke-opacity="0.22" stroke-width="2" stroke-dasharray="1 9" stroke-linecap="round"/>
+  </svg>`;
+}
+
 function renderLanding() {
   const available = listings.filter(l => l.status === "available");
   const collected = listings.filter(l => l.status === "collected");
@@ -397,12 +476,17 @@ function renderLanding() {
 
   return `
     <section class="hero">
-      <div class="hero-eyebrow">A MANIFEST FOR WHAT'S NEXT</div>
-      <h1 class="hero-title">Give what you<br>don't need.<br><span class="hero-title-accent">Take what you do.</span></h1>
-      <p class="hero-sub">DumpTrade connects households, workshops and industries so unwanted material finds its next use &mdash; instead of a dumpsite or a fire.</p>
-      <div class="hero-actions">
-        <button class="btn btn-primary" data-action="nav-browse">Browse listings</button>
-        <button class="btn btn-outline-dark" data-action="nav-post">+ Post an item</button>
+      <div class="hero-content">
+        <div class="hero-eyebrow">A MANIFEST FOR WHAT'S NEXT</div>
+        <h1 class="hero-title">Give what you<br>don't need.<br><span class="hero-title-accent">Take what you do.</span></h1>
+        <p class="hero-sub">DumpTrade connects households, workshops and industries so unwanted material finds its next use &mdash; instead of a dumpsite or a fire.</p>
+        <div class="hero-actions">
+          <button class="btn btn-primary" data-action="nav-browse">Browse listings</button>
+          <button class="btn btn-outline-dark" data-action="nav-post">+ Post an item</button>
+        </div>
+      </div>
+      <div class="hero-visual">
+        <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQXwwflm1E43cI1k4IV04fkqsknAtr4gjb8isL8qg-0DQ&s=10" alt="Materials ready to be claimed">
       </div>
     </section>
 
