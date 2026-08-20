@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Log in &mdash; DumpTrade</title>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<div class="blob blob-1"></div>
+<div class="blob blob-2"></div>
+
+<nav class="topnav">
+  <a class="brand" href="index.html"><span class="brand-mark">DT</span><span class="brand-name">DumpTrade</span></a>
+  <div class="nav-links">
+    <a class="nav-btn" href="index.html">Home</a>
+    <a class="nav-btn" href="browse.html">Browse</a>
+    <a class="nav-btn" href="post.html">Post an item</a>
+  </div>
+  <div class="nav-auth">
+    <a class="btn btn-outline" href="login.html">Log in</a>
+    <a class="btn btn-primary" href="register.html">Register</a>
+  </div>
+</nav>
+
+<main>
+  <div class="section">
+    <div class="section-head"><span class="section-eyebrow">LOG IN</span><h2>Welcome back</h2></div>
+    <form class="form-card auth-card" onsubmit="handleAuthSubmit(event)">
+      <label class="field"><span>Email</span><input type="email" required placeholder="you@example.com"></label>
+      <label class="field"><span>Password</span><input type="password" required placeholder="********"></label>
+      <div class="detail-actions">
+        <button class="btn btn-primary" type="submit">Log in</button>
+      </div>
+      <p class="auth-switch">New here? <a class="link-btn" href="register.html">Register</a></p>
+    </form>
+  </div>
+</main>
+
+<script src="js/api.js"></script>
+<script src="js/listings.js"></script>
+<script src="js/auth.js"></script>
+</body>
+</html>

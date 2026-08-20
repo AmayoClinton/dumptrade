@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Post an item &mdash; DumpTrade</title>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<div class="blob blob-1"></div>
+<div class="blob blob-2"></div>
+
+<nav class="topnav">
+  <a class="brand" href="index.html"><span class="brand-mark">DT</span><span class="brand-name">DumpTrade</span></a>
+  <div class="nav-links">
+    <a class="nav-btn" href="index.html">Home</a>
+    <a class="nav-btn" href="browse.html">Browse</a>
+    <a class="nav-btn active" href="post.html">Post an item</a>
+  </div>
+  <div class="nav-auth">
+    <a class="btn btn-outline" href="login.html">Log in</a>
+    <a class="btn btn-primary" href="register.html">Register</a>
+  </div>
+</nav>
+
+<main>
+  <div class="section">
+    <div class="section-head"><span class="section-eyebrow">POST AN ITEM</span><h2>What are you giving away?</h2></div>
+    <div class="form-card">
+      <label class="field"><span>Photo</span>
+        <div id="dropzone" class="dropzone">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+          <div class="dropzone-text">Click to upload or drag & drop</div>
+          <div class="dropzone-sub">PNG or JPG, shown as a preview only in this mockup</div>
+        </div>
+        <input type="file" id="photo-input" accept="image/*" style="display:none">
+      </label>
+      <label class="field"><span>Title</span><input id="f-title" placeholder="e.g. 3 office chairs, minor wear"></label>
+      <label class="field"><span>Category</span>
+        <select id="f-category"></select>
+      </label>
+      <div class="field-row">
+        <label class="field"><span>Quantity label</span><input id="f-qtylabel" placeholder="e.g. 3 units, 40kg"></label>
+        <label class="field"><span>Quantity (numeric)</span><input id="f-qtynum" type="number" min="1" value="1"></label>
+      </div>
+      <label class="field"><span>Condition</span><input id="f-condition" placeholder="e.g. Used - good"></label>
+      <label class="field"><span>Location</span><input id="f-location" placeholder="e.g. Kisumu, Milimani"></label>
+      <label class="field"><span>Description</span><textarea id="f-description" rows="3" placeholder="Anything a claimant should know"></textarea></label>
+      <div class="detail-actions">
+        <button class="btn btn-primary" onclick="submitPost()">Post listing</button>
+        <a class="btn btn-outline-dark" href="index.html">Cancel</a>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script src="js/api.js"></script>
+<script src="js/listings.js"></script>
+<script src="js/post.js"></script>
+</body>
+</html>
