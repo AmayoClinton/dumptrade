@@ -13,16 +13,13 @@ import (
 )
 
 func main() {
-	// 1. Load environment variables from .env
 	db.LoadEnv()
 
-	// 2. Initialize the database connection pool
 	if err := db.Connect(); err != nil {
 		log.Fatalf("Database connection failed: %v", err)
 	}
 	defer db.Close()
 
-	// 3. Run database migrations to ensure all tables and types exist
 	if err := db.Migrate(); err != nil {
 		log.Fatalf("Database migration failed: %v", err)
 	}
@@ -31,7 +28,6 @@ func main() {
 	}
 	log.Println("Database connection pool established, migrations applied, and data seeded successfully")
 
-	// 4. Configuration
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
@@ -41,40 +37,40 @@ func main() {
 		jwtSecret = "dumptrade-secret-key-12345"
 	}
 
-	// 5. Stores & Handlers
 	userStore := handlers.NewPostgresUserStore()
 	listingStore := handlers.NewPostgresListingStore()
 
 	authHandler := handlers.NewAuthHandler(userStore, jwtSecret)
 	listingHandler := handlers.NewListingHandler(listingStore)
 
-	// 6. Router & Middleware
 	router := gin.Default()
 	router.Use(middleware.CORS())
 
-	// Serve Frontend directly on http://localhost:8080/
 	frontendDir := "../frontend"
 	if _, err := os.Stat(frontendDir); err == nil {
 		router.StaticFile("/", frontendDir+"/index.html")
 		router.StaticFile("/index.html", frontendDir+"/index.html")
+		router.StaticFile("/browse.html", frontendDir+"/browse.html")
+		router.StaticFile("/listing.html", frontendDir+"/listing.html")
+		router.StaticFile("/post.html", frontendDir+"/post.html")
+		router.StaticFile("/login.html", frontendDir+"/login.html")
+		router.StaticFile("/register.html", frontendDir+"/register.html")
+		router.Static("/css", frontendDir+"/css")
+		router.Static("/js", frontendDir+"/js")
 	}
 
 	api := router.Group("/api")
 	{
-		// Health check
 		api.GET("/health", func(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{"status": "ok", "service": "dumptrade-api"})
 		})
 
-		// Auth
 		api.POST("/register", authHandler.Register)
 		api.POST("/login", authHandler.Login)
 
-		// Listings (Public read)
 		api.GET("/listings", listingHandler.GetListings)
 		api.GET("/listings/:id", listingHandler.GetListing)
 
-		// Protected routes (Require valid JWT)
 		protected := api.Group("")
 		protected.Use(middleware.AuthRequired([]byte(jwtSecret)))
 		{
