@@ -28,9 +28,9 @@
   <div class="section">
     <div class="section-head"><span class="section-eyebrow">REGISTER</span><h2>Create an account</h2></div>
     <form class="form-card auth-card" onsubmit="handleAuthSubmit(event)">
-      <label class="field"><span>Name</span><input required placeholder="Your name or organization name"></label>
-      <label class="field"><span>Email</span><input type="email" required placeholder="you@example.com"></label>
-      <label class="field"><span>Password</span><input type="password" required placeholder="********"></label>
+      <label class="field"><span>Name</span><input id="reg-name" required placeholder="Your name or organization name"></label>
+      <label class="field"><span>Email</span><input id="reg-email" type="email" required placeholder="you@example.com"></label>
+      <label class="field"><span>Password</span><input id="reg-password" type="password" required placeholder="********"></label>
       <label class="field"><span>Account type</span>
         <div class="toggle-row">
           <button type="button" class="toggle-btn toggle-active" id="toggle-individual" onclick="selectAccountType('individual')">Individual</button>
