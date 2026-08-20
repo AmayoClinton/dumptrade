@@ -1,0 +1,139 @@
+---
+Title: "DumpTrade — Project Overview"
+subtitle: "Reducing dumping and burning through peer-to-peer and industrial waste redistribution"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    theme: flatly
+---
+
+## 1. Executive Summary
+
+DumpTrade is a web platform that lets individuals, businesses, and industries post materials
+they no longer need, so that others who could use them can claim them instead of the items
+being dumped, burned, or landfilled. The platform serves two overlapping needs:
+
+- **Household/community reuse** — people give away or find usable items nearby.
+- **Industrial/commercial symbiosis** — one business's waste (offcuts, byproducts, packaging,
+  organic waste, etc.) becomes another's raw material.
+
+The core value proposition: **make it as easy to give away or claim waste as it is to post
+a photo on social media.**
+
+## 2. Problem Statement
+
+- Households and businesses generate waste that still has value but ends up dumped or burned
+  due to lack of an easy redistribution channel.
+- Open burning and illegal dumping are common where formal waste collection is expensive,
+  slow, or unavailable.
+- Small industries and workshops that could reuse offcuts, organic waste, or byproducts from
+  other businesses often have no visibility into what's available nearby.
+
+## 3. Solution Overview
+
+A simple listing-and-claim marketplace:
+
+1. **Post** — a user lists an item/material with a title, category, photo, quantity, and location.
+2. **Browse/Search** — other users filter by category and location to find what they need.
+3. **Claim** — a claimant requests the item; the poster is notified and contact info is shared.
+4. **Collect & Close** — the listing is marked collected, closing the loop and feeding impact
+   metrics (e.g. items reused, estimated kg diverted from landfill).
+
+### Core MVP Features
+- Register/login (individual or organization account type)
+- Post a listing (title, category, photo, quantity/condition, location)
+- Browse listings with category + location filters
+- Claim a listing (status: available -> claimed -> collected)
+- Basic notifications (in-app or email) on claim
+- Simple impact counter (items reused / estimated waste diverted)
+
+### Stretch Features (if time allows)
+- Map view of nearby listings
+- Recurring/bulk listings for organizations
+- Trust badges (successful claim count)
+- Report/flag listing
+- Admin moderation view
+
+## 4. Team & Roles
+
+Roles are structured for a 5-person hackathon team with minimal overlap
+so work can proceed in parallel._
+
+| # | Role | Responsibilities | Name |
+|---|------|-------------------|------|
+| 1 | **Team Lead / Backend Developer** | Architecture decisions, API design, auth system, integrates all backend pieces | _TBD_ |
+| 2 | **Frontend Developer** | Core UI screens (browse, post, claim flows), state management, API integration | _TBD_ |
+| 3 | **UI/UX Designer** | Wireframes, simple/clean visual design, user flow diagrams, usability polish | _TBD_ |
+| 4 | **Backend/Database Developer** | Database schema, listings + claims logic, notifications, deployment/CI-CD | _TBD_ |
+| 5 | **QA / DevOps / Pitch Lead** | Testing, bug triage, demo data seeding, deployment checks, pitch deck & presentation | _TBD_ |
+
+## 5. Suggested Tech Stack
+
+Pick based on team familiarity — speed matters more than novelty in a hackathon.
+
+- **Frontend:** React + Vite + Tailwind CSS (fast to build, familiar to most teams)
+- **Backend:** Go (net/http or a light framework) or Node/Express — whichever the team is
+  fastest with
+- **Database:** SQLite (Turso) or Postgres — SQLite is fastest to set up for a hackathon
+- **Auth:** Email/password or single OAuth provider (Google) — avoid multi-provider auth for MVP
+- **Image storage:** Simple object storage (e.g. Cloudinary free tier) or base64 in early MVP
+- **Deployment:** Render or Vercel for frontend, Render for backend
+- **Notifications:** In-app status only for MVP; email (Resend) if time allows
+
+## 6. Project Structure (proposed)
+
+```
+wastetrade/
+├── frontend/
+│   ├── src/
+│   │   ├── pages/          # Home, Browse, PostItem, ListingDetail, Login, Register, Profile
+│   │   ├── components/     # Navbar, ListingCard, ClaimButton, CategoryFilter, ImpactCounter
+│   │   ├── hooks/
+│   │   ├── api/            # API client functions
+│   │   └── App.tsx
+│   └── package.json
+├── backend/
+│   ├── handlers/           # auth, listings, claims, users
+│   ├── models/              # User, Listing, Claim
+│   ├── db/                  # schema, migrations
+│   ├── middleware/          # auth middleware
+│   └── main.go / server.js
+├── docs/
+│   ├── wireframes/
+│   └── pitch-deck/
+└── README.md
+```
+
+## 7. Core Data Model (draft)
+
+- **User**: id, name, email, password_hash, account_type (individual/organization), location
+- **Listing**: id, user_id, title, category, description, photo_url, quantity, condition,
+  status (available/claimed/collected), location, created_at
+- **Claim**: id, listing_id, claimant_id, claimed_at, status
+
+## 8. User Flow (MVP)
+
+1. User registers/logs in
+2. User posts a listing OR browses existing listings
+3. Claimant filters by category/location, finds an item, claims it
+4. Poster gets notified, contact details exchanged
+5. Once collected, poster (or claimant) marks it as collected
+6. Impact counter updates
+
+## 9. Success Metrics for Demo
+
+- Number of listings posted during demo/testing period
+- Number of successful claims (full loop completed)
+- Estimated waste diverted (simple weight/category-based estimate)
+- Time-to-post and time-to-claim (showing how simple the flow is)
+
+## 10. Open Questions / Brainstorm Notes
+
+_Use this space to keep dropping ideas as the team discusses._
+
+- Should industrial/organization accounts require any verification?
+- Do we need in-app messaging, or is exchanging contact info enough for MVP?
+- How do we estimate "kg diverted" without real weight data — self-reported estimate per category?
+- What's the minimum viable notification system (poll on page load vs push/email)?
