@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DumpTrade &mdash; Give what you don't need</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Big+Shoulders+Stencil:wght@700;900&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+  :root {
+    --paper: #F6F3EA;
+    --paper-deep: #ECE8D9;
+    --ink: #12201A;
+    --ink-soft: #5B665C;
+    --green-1: #0B7A4C;
+    --green-2: #17A468;
+    --green-3: #74F2AE;
+    --tangerine: #F0672C;
+    --gold: #F0AE2E;
+    --card: #FFFFFF;
+    --line: #E2DECB;
+    --shadow-green: rgba(11, 122, 76, 0.22);
+    --radius: 16px;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: 'Manrope', sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    min-height: 100vh;
+  }
+  h1, h2 { font-family: 'Big Shoulders Stencil', sans-serif; letter-spacing: .02em; margin: 0; }
+  button { font-family: inherit; cursor: pointer; }
+  input, select, textarea { font-family: 'Manrope', sans-serif; }
+  a { color: inherit; }
+
+  /* Decorative background blobs */
+  .blob {
+    position: fixed; border-radius: 50%; filter: blur(70px); opacity: .35; z-index: 0; pointer-events: none;
+  }
+  .blob-1 { width: 420px; height: 420px; background: var(--green-3); top: -160px; right: -120px; }
+  .blob-2 { width: 320px; height: 320px; background: var(--gold); bottom: -140px; left: -100px; opacity: .18; }
+
+  #app { position: relative; z-index: 1; }
+
+  /* ---------- Nav ---------- */
+  .topnav {
+    position: sticky; top: 0; z-index: 40;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 28px;
+    background: rgba(18, 32, 26, 0.92);
+    backdrop-filter: blur(10px);
+    color: #F6F3EA;
+    flex-wrap: wrap; gap: 12px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; cursor: pointer; border: none; background: none; }
+  .brand-mark {
+    width: 38px; height: 38px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--green-3), var(--green-2));
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Big Shoulders Stencil', sans-serif; font-size: 16px; color: var(--ink);
+    box-shadow: 0 0 18px var(--shadow-green);
+  }
+  .brand-name { font-family: 'Big Shoulders Stencil', sans-serif; font-size: 1.35rem; letter-spacing: .04em; color: #F6F3EA; }
+  .nav-links { display: flex; gap: 4px; flex-wrap: wrap; }
+  .nav-btn {
+    background: none; border: none; padding: 9px 15px; font-size: .86rem;
+    font-weight: 600; color: rgba(246,243,234,0.65); border-radius: 8px; transition: all .15s ease;
+  }
+  .nav-btn:hover { color: #fff; background: rgba(255,255,255,0.08); }
+  .nav-btn.active { color: var(--green-3); background: rgba(116,242,174,0.1); }
+  .nav-auth { display: flex; gap: 8px; }
+
+  .btn {
+    font-size: .85rem; font-weight: 700; padding: 11px 22px; border-radius: 10px;
+    border: none; letter-spacing: .01em; transition: all .15s ease;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--green-2), var(--green-1));
+    color: #fff; box-shadow: 0 6px 18px var(--shadow-green);
+  }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 10px 24px var(--shadow-green); }
+  .btn-primary:disabled { background: #b7b8ac; box-shadow: none; cursor: not-allowed; transform: none; }
+  .btn-outline {
+    background: rgba(255,255,255,0.06); color: #fff; border: 1.5px solid rgba(255,255,255,0.35);
+  }
+  .btn-outline:hover { background: rgba(255,255,255,0.14); }
+  .btn-outline-dark { background: transparent; color: var(--ink); border: 1.5px solid var(--line); }
+  .btn-outline-dark:hover { border-color: var(--ink); background: rgba(18,32,26,0.04); }
+
+  /* ---------- Hero ---------- */
+  .hero { padding: 76px 28px 44px; max-width: 780px; }
+  .hero-eyebrow {
+    display: inline-flex; align-items: center; gap: 8px; font-family: 'JetBrains Mono', monospace;
+    font-size: .74rem; letter-spacing: .12em; color: var(--green-1); background: rgba(23,164,104,0.1);
+    padding: 6px 12px; border-radius: 20px; margin-bottom: 20px;
+  }
+  .hero-title { font-size: 3.4rem; line-height: 1.02; }
+  .hero-title-accent {
+    background: linear-gradient(135deg, var(--green-1), var(--green-2) 60%, var(--tangerine));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .hero-sub { font-size: 1.08rem; color: var(--ink-soft); max-width: 500px; margin: 24px 0 30px; line-height: 1.6; }
+  .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+
+  /* ---------- Impact strip ---------- */
+  .impact-strip {
+    display: flex; gap: 16px; margin: 0 28px 12px; flex-wrap: wrap;
+  }
+  .impact-card {
+    flex: 1; min-width: 160px; padding: 24px 22px; border-radius: var(--radius);
+    background: linear-gradient(150deg, var(--green-1), var(--green-2));
+    color: #fff; box-shadow: 0 12px 28px var(--shadow-green);
+  }
+  .impact-num { font-family: 'Big Shoulders Stencil', sans-serif; font-size: 2.4rem; }
+  .impact-label { font-size: .8rem; opacity: .85; text-transform: uppercase; letter-spacing: .06em; margin-top: 2px; }
+
+  /* ---------- Sections ---------- */
+  .section { padding: 52px 28px; max-width: 1100px; margin: 0 auto; }
+  .section-head { margin-bottom: 24px; }
+  .section-eyebrow { font-family: 'JetBrains Mono', monospace; font-size: .74rem; letter-spacing: .1em; color: var(--tangerine); }
+  .section-head h2 { font-size: 2rem; margin-top: 6px; }
+
+  .chip-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+  .chip {
+    display: flex; align-items: center; gap: 8px; background: var(--card);
+    border: 1.5px solid var(--line); border-radius: 24px; padding: 8px 16px 8px 8px;
+    font-size: .84rem; font-weight: 600; color: var(--ink); transition: all .15s ease;
+  }
+  .chip:hover { border-color: var(--green-2); transform: translateY(-1px); }
+  .chip-active { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .chip-swatch, .cat-tag-swatch {
+    font-family: 'JetBrains Mono', monospace; font-size: .65rem; font-weight: 700;
+    background: linear-gradient(135deg, var(--green-2), var(--green-1)); color: #fff;
+    padding: 3px 6px; border-radius: 5px;
+  }
+
+  /* ---------- Ticket cards ---------- */
+  .ticket-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 22px; margin-top: 26px; }
+  .ticket-card {
+    background: var(--card); border-radius: var(--radius); text-align: left; padding: 0;
+    overflow: hidden; display: flex; flex-direction: column; border: 1px solid var(--line);
+    transition: transform .18s ease, box-shadow .18s ease; box-shadow: 0 2px 8px rgba(18,32,26,0.04);
+  }
+  .ticket-card:hover { transform: translateY(-5px); box-shadow: 0 18px 34px rgba(11,122,76,0.16); }
+  .ticket-photo {
+    height: 130px; position: relative; display: flex; align-items: center; justify-content: center;
+    font-family: 'Big Shoulders Stencil', sans-serif; font-size: 2.3rem; color: rgba(255,255,255,.55);
+    background: linear-gradient(135deg, var(--green-2), var(--green-1));
+    background-size: cover; background-position: center;
+  }
+  .stamp-badge {
+    position: absolute; top: 12px; right: 12px; border-radius: 20px;
+    padding: 4px 12px; font-family: 'JetBrains Mono', monospace; font-size: .64rem; font-weight: 700;
+    letter-spacing: .05em; text-transform: uppercase; transform: rotate(-4deg);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+  }
+  .stamp-available { background: #fff; color: var(--green-1); }
+  .stamp-claimed { background: var(--gold); color: #4A3707; }
+  .stamp-collected { background: rgba(255,255,255,0.9); color: var(--ink-soft); }
+
+  .ticket-perf { height: 0; border-top: 2px dashed var(--line); margin: 0 14px; position: relative; }
+  .ticket-perf::before, .ticket-perf::after {
+    content: ''; position: absolute; top: -7px; width: 14px; height: 14px; background: var(--paper); border-radius: 50%;
+  }
+  .ticket-perf::before { left: -20px; }
+  .ticket-perf::after { right: -20px; }
+
+  .ticket-body { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 7px; flex: 1; }
+  .cat-tag { display: inline-flex; align-items: center; gap: 6px; font-size: .72rem; font-weight: 600; color: var(--ink-soft); width: fit-content; }
+  .ticket-title { font-family: 'Manrope', sans-serif; font-size: 1.02rem; font-weight: 800; margin: 2px 0 0; line-height: 1.3; }
+  .ticket-meta { font-size: .78rem; color: var(--ink-soft); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .ticket-meta .meta-item { display: inline-flex; align-items: center; gap: 4px; }
+  .ticket-qty { font-family: 'JetBrains Mono', monospace; font-size: .76rem; color: var(--tangerine); font-weight: 600; margin-top: 4px; }
+
+  /* ---------- How it works ---------- */
+  .how-it-works { background: var(--card); border-radius: 24px; margin: 0 28px; max-width: 1100px; margin-inline: auto; }
+  .steps-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 26px; margin-top: 12px; }
+  .step { padding: 4px 0; }
+  .step-num {
+    display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px;
+    border-radius: 12px; background: linear-gradient(135deg, var(--green-3), var(--green-2));
+    font-family: 'Big Shoulders Stencil', sans-serif; font-size: 1.1rem; color: var(--ink); margin-bottom: 12px;
+  }
+  .step h3 { font-family: 'Manrope', sans-serif; font-size: 1.05rem; font-weight: 800; margin-bottom: 6px; }
+  .step p { font-size: .9rem; color: var(--ink-soft); line-height: 1.55; margin: 0; }
+
+  /* ---------- Browse ---------- */
+  .search-row { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+  .search-input, .select-input {
+    padding: 12px 16px; border: 1.5px solid var(--line); border-radius: 10px; font-size: .9rem;
+    background: var(--card); color: var(--ink); transition: border-color .15s ease;
+  }
+  .search-input:focus, .select-input:focus { outline: none; border-color: var(--green-2); box-shadow: 0 0 0 3px rgba(23,164,104,0.15); }
+  .search-input { flex: 1; min-width: 220px; }
+  .empty-state { padding: 48px; text-align: center; color: var(--ink-soft); border: 1.5px dashed var(--line); border-radius: var(--radius); margin-top: 24px; background: var(--card); }
+
+  /* ---------- Detail ---------- */
+  .detail-section { max-width: 780px; }
+  .back-link { background: none; border: none; color: var(--ink-soft); font-size: .86rem; margin-bottom: 20px; padding: 6px 0; display: inline-flex; align-items: center; gap: 6px; }
+  .back-link:hover { color: var(--ink); }
+  .detail-card { border-radius: 22px; overflow: hidden; background: var(--card); box-shadow: 0 20px 50px rgba(18,32,26,0.08); }
+  .detail-photo {
+    height: 260px; position: relative; display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, var(--green-2), var(--green-1));
+    background-size: cover; background-position: center;
+    font-family: 'Big Shoulders Stencil', sans-serif; font-size: 3.2rem; color: rgba(255,255,255,.55);
+  }
+  .detail-body { padding: 30px 32px 34px; }
+  .detail-title { font-size: 2rem; margin: 10px 0 14px; }
+  .detail-desc { color: var(--ink-soft); line-height: 1.6; margin-bottom: 22px; font-size: 1rem; }
+  .detail-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 24px; margin-bottom: 28px; font-size: .92rem; border-top: 1px dashed var(--line); padding-top: 20px; }
+  .fact-label { display: block; font-family: 'JetBrains Mono', monospace; font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; color: var(--tangerine); margin-bottom: 3px; }
+  .detail-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+  .collected-note {
+    display: inline-flex; align-items: center; gap: 8px; font-size: .92rem; color: var(--green-1); font-weight: 700;
+    background: rgba(23,164,104,0.1); padding: 12px 18px; border-radius: 10px;
+  }
+
+  /* ---------- Forms ---------- */
+  .form-card { background: var(--card); border-radius: 22px; padding: 30px 32px; max-width: 580px; display: flex; flex-direction: column; gap: 18px; box-shadow: 0 16px 40px rgba(18,32,26,0.06); }
+  .field { display: flex; flex-direction: column; gap: 7px; font-size: .84rem; font-weight: 700; color: var(--ink-soft); }
+  .field input, .field select, .field textarea {
+    padding: 11px 14px; border: 1.5px solid var(--line); border-radius: 10px; font-size: .92rem; color: var(--ink); background: #fff;
+    font-weight: 400; transition: border-color .15s ease, box-shadow .15s ease;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus {
+    outline: none; border-color: var(--green-2); box-shadow: 0 0 0 3px rgba(23,164,104,0.15);
+  }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+  /* Photo upload dropzone */
+  .dropzone {
+    border: 2px dashed var(--line); border-radius: 14px; padding: 26px; text-align: center;
+    color: var(--ink-soft); cursor: pointer; transition: all .15s ease; background: var(--paper);
+  }
+  .dropzone:hover, .dropzone.dragover { border-color: var(--green-2); background: rgba(23,164,104,0.06); color: var(--green-1); }
+  .dropzone svg { margin-bottom: 8px; }
+  .dropzone-text { font-size: .86rem; font-weight: 600; }
+  .dropzone-sub { font-size: .74rem; color: var(--ink-soft); margin-top: 4px; }
+  .photo-preview-wrap { position: relative; border-radius: 14px; overflow: hidden; height: 160px; }
+  .photo-preview-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .photo-remove-btn {
+    position: absolute; top: 8px; right: 8px; background: rgba(18,32,26,0.75); color: #fff; border: none;
+    border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+  }
+  .photo-remove-btn:hover { background: var(--ink); }
+
+  .auth-card { max-width: 420px; }
+  .toggle-row { display: flex; gap: 8px; }
+  .toggle-btn { flex: 1; padding: 10px; border: 1.5px solid var(--line); border-radius: 10px; background: #fff; font-size: .84rem; font-weight: 600; color: var(--ink-soft); }
+  .toggle-active { background: linear-gradient(135deg, var(--green-2), var(--green-1)); color: #fff; border-color: transparent; }
+  .auth-switch { font-size: .84rem; color: var(--ink-soft); margin-top: 2px; }
+  .link-btn { background: none; border: none; color: var(--tangerine); font-weight: 700; padding: 0; text-decoration: underline; }
+
+  /* ---------- Toast ---------- */
+  .toast {
+    position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%);
+    background: var(--ink); color: #F6F3EA; padding: 13px 22px; border-radius: 12px;
+    font-size: .86rem; font-weight: 600; box-shadow: 0 12px 30px rgba(0,0,0,.3);
+    z-index: 100; max-width: 90vw; display: flex; align-items: center; gap: 10px;
+    border-left: 4px solid var(--green-3); animation: toastIn .25s ease;
+  }
+  @keyframes toastIn { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+  #page-content { animation: fadeUp .3s ease; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  @media (max-width: 640px) {
+    .hero-title { font-size: 2.4rem; }
+    .impact-strip { flex-direction: column; }
+    .field-row { grid-template-columns: 1fr; }
+    .detail-facts { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="blob blob-1"></div>
+<div class="blob blob-2"></div>
+<div id="app"></div>
+
+<script>
+/* ============================================================
+   Icons
+============================================================ */
+const ICON = {
+  pin: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>`,
+  clock: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>`,
+  upload: `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>`,
+  back: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>`,
+  check: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`,
+  close: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`,
+};
+
+/* ============================================================
+   Data
+============================================================ */
+const CATEGORIES = [
+  { key: "furniture", label: "Furniture", avgKg: 15, tag: "FN" },
+  { key: "ewaste", label: "E-Waste", avgKg: 4, tag: "EW" },
+  { key: "textiles", label: "Textiles", avgKg: 3, tag: "TX" },
+  { key: "construction", label: "Construction", avgKg: 10, tag: "CN" },
+  { key: "organic", label: "Organic", avgKg: 2, tag: "OR" },
+  { key: "plastic", label: "Plastic / Packaging", avgKg: 1, tag: "PL" },
+  { key: "industrial", label: "Industrial Byproduct", avgKg: 18, tag: "IN" },
+  { key: "other", label: "Other", avgKg: 3, tag: "OT" },
+];
+function catMeta(key) { return CATEGORIES.find(c => c.key === key) || CATEGORIES[CATEGORIES.length - 1]; }
+function hoursAgo(h) { return new Date(Date.now() - h * 3600 * 1000).toISOString(); }
+function timeAgo(iso) {
+  const hrs = Math.round((Date.now() - new Date(iso).getTime()) / 3600000);
+  if (hrs < 1) return "just now";
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.round(hrs / 24)}d ago`;
+}
+
+let listings = [
+  { id: 1, title: "3 office chairs, minor wear", category: "furniture", qtyLabel: "3 units", qtyNum: 3, condition: "Used - good", location: "Kisumu, Milimani", status: "available", posterName: "Amina O.", accountType: "individual", postedAt: hoursAgo(2), description: "Swivel chairs from a closed workspace. Two need a screw tightened, otherwise solid.", photoUrl: null },
+  { id: 2, title: "Offcut timber, mixed sizes", category: "construction", qtyLabel: "~40kg", qtyNum: 4, condition: "New offcuts", location: "Nairobi, Industrial Area", status: "available", posterName: "Zawadi Works Ltd.", accountType: "organization", postedAt: hoursAgo(5), description: "Leftover from cabinet production. Good for small joinery or a firewood alternative.", photoUrl: null },
+  { id: 3, title: "Broken laptops (for parts)", category: "ewaste", qtyLabel: "6 units", qtyNum: 6, condition: "Non-functional", location: "Kisumu, CBD", status: "claimed", posterName: "Brian K.", accountType: "individual", postedAt: hoursAgo(30), description: "Screens cracked, boards may still work. Good for a repair shop or e-waste recycler.", photoUrl: null },
+  { id: 4, title: "Fabric offcuts, assorted colors", category: "textiles", qtyLabel: "5 bags", qtyNum: 5, condition: "New offcuts", location: "Nairobi, Gikomba", status: "available", posterName: "Cheza Tailors", accountType: "organization", postedAt: hoursAgo(8), description: "Cotton and ankara offcuts from tailoring. Great for patchwork or stuffing.", photoUrl: null },
+  { id: 5, title: "Spent coffee grounds, daily", category: "organic", qtyLabel: "10kg / day", qtyNum: 5, condition: "Fresh daily", location: "Kisumu, Milimani", status: "available", posterName: "Java Corner Cafe", accountType: "organization", postedAt: hoursAgo(1), description: "Recurring listing — great for composting or mushroom substrate. Collect daily after 6pm.", photoUrl: null },
+  { id: 6, title: "Dining table, one leg wobbly", category: "furniture", qtyLabel: "1 unit", qtyNum: 1, condition: "Used - fair", location: "Kisumu, Nyalenda", status: "collected", posterName: "Grace W.", accountType: "individual", postedAt: hoursAgo(60), description: "Solid wood, just needs a leg brace.", photoUrl: null },
+  { id: 7, title: "PET bottle bales", category: "plastic", qtyLabel: "200kg", qtyNum: 20, condition: "Sorted, clean", location: "Nairobi, Industrial Area", status: "available", posterName: "Pack Right Ltd.", accountType: "organization", postedAt: hoursAgo(12), description: "Baled PET from packaging line. Ready for a recycler with pickup capacity.", photoUrl: null },
+  { id: 8, title: "Metal shavings from lathe work", category: "industrial", qtyLabel: "80kg", qtyNum: 5, condition: "Mixed alloy", location: "Kisumu, Kibos Road", status: "available", posterName: "Otieno Metal Works", accountType: "organization", postedAt: hoursAgo(20), description: "Steel and aluminum shavings, unsorted. Good for scrap buyers.", photoUrl: null },
+  { id: 9, title: "Kids clothes, outgrown", category: "textiles", qtyLabel: "2 bags", qtyNum: 2, condition: "Used - good", location: "Nairobi, Kasarani", status: "collected", posterName: "Faith M.", accountType: "individual", postedAt: hoursAgo(90), description: "Ages 2-6, mixed. Clean and folded.", photoUrl: null },
+  { id: 10, title: "Old car batteries", category: "ewaste", qtyLabel: "4 units", qtyNum: 4, condition: "Dead", location: "Kisumu, Mamboleo", status: "available", posterName: "Peter N.", accountType: "individual", postedAt: hoursAgo(3), description: "For a licensed e-waste or battery recycler only, please.", photoUrl: null },
+];
+let nextId = 100;
+
+const state = { page: "landing", selectedId: null, authMode: "login" };
+const browseState = { category: null, status: "available", search: "" };
+let postPhotoDataUrl = null;
+
+/* ============================================================
+   Toast
+============================================================ */
+let toastTimer = null;
+function showToast(msg) {
+  let el = document.getElementById("toast");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "toast";
+    el.className = "toast";
+    document.body.appendChild(el);
+  }
+  el.innerHTML = msg;
+  el.style.display = "flex";
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.style.display = "none"; }, 3000);
+}
+
+/* ============================================================
+   Reusable card renderers
+============================================================ */
+function stampBadge(status) {
+  const label = status === "available" ? "Available" : status === "claimed" ? "Claimed" : "Collected";
+  const cls = status === "available" ? "stamp-available" : status === "claimed" ? "stamp-claimed" : "stamp-collected";
+  return `<span class="stamp-badge ${cls}">${label}</span>`;
+}
+function catTag(catKey) {
+  const m = catMeta(catKey);
+  return `<span class="cat-tag"><span class="cat-tag-swatch">${m.tag}</span>${m.label}</span>`;
+}
+function ticketCard(l) {
+  const m = catMeta(l.category);
+  const bg = l.photoUrl ? `style="background-image:url('${l.photoUrl}')"` : "";
+  return `
+    <button class="ticket-card" data-action="open-detail" data-id="${l.id}">
+      <div class="ticket-photo" ${bg}>
+        ${l.photoUrl ? "" : `<span>${m.tag}</span>`}
+        ${stampBadge(l.status)}
+      </div>
+      <div class="ticket-perf"></div>
+      <div class="ticket-body">
+        ${catTag(l.category)}
+        <h3 class="ticket-title">${l.title}</h3>
+        <div class="ticket-meta">
+          <span class="meta-item">${ICON.pin}${l.location}</span>
+          <span class="meta-item">${ICON.clock}${timeAgo(l.postedAt)}</span>
+        </div>
+        <div class="ticket-qty">${l.qtyLabel} &mdash; est. ${m.avgKg * l.qtyNum}kg</div>
+      </div>
+    </button>`;
+}
+
+/* ============================================================
+   Page renderers
+============================================================ */
+function renderLanding() {
+  const available = listings.filter(l => l.status === "available");
+  const collected = listings.filter(l => l.status === "collected");
+  const totalKg = collected.reduce((s, l) => s + catMeta(l.category).avgKg * l.qtyNum, 0);
+
+  return `
+    <section class="hero">
+      <div class="hero-eyebrow">A MANIFEST FOR WHAT'S NEXT</div>
+      <h1 class="hero-title">Give what you<br>don't need.<br><span class="hero-title-accent">Take what you do.</span></h1>
+      <p class="hero-sub">DumpTrade connects households, workshops and industries so unwanted material finds its next use &mdash; instead of a dumpsite or a fire.</p>
+      <div class="hero-actions">
+        <button class="btn btn-primary" data-action="nav-browse">Browse listings</button>
+        <button class="btn btn-outline-dark" data-action="nav-post">+ Post an item</button>
+      </div>
+    </section>
+
+    <section class="impact-strip">
+      <div class="impact-card"><div class="impact-num">${collected.length}</div><div class="impact-label">items rescued</div></div>
+      <div class="impact-card"><div class="impact-num">~${totalKg}kg</div><div class="impact-label">est. diverted from landfill</div></div>
+      <div class="impact-card"><div class="impact-num">${available.length}</div><div class="impact-label">available right now</div></div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-eyebrow">01 &mdash; CATEGORIES</span><h2>Sort by material</h2></div>
+      <div class="chip-row">
+        ${CATEGORIES.map(c => `<button class="chip" data-action="filter-and-browse" data-cat="${c.key}"><span class="chip-swatch">${c.tag}</span>${c.label}</button>`).join("")}
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="section-eyebrow">02 &mdash; ON THE MANIFEST</span><h2>Recently listed</h2></div>
+      <div class="ticket-grid">${available.slice(0, 6).map(ticketCard).join("")}</div>
+    </section>
+
+    <section class="how-it-works section">
+      <div class="section-head"><span class="section-eyebrow">03 &mdash; THE PROCESS</span><h2>How it works</h2></div>
+      <div class="steps-row">
+        <div class="step"><div class="step-num">1</div><h3>Post</h3><p>List what you no longer need &mdash; a photo, a category, a location. Takes under a minute.</p></div>
+        <div class="step"><div class="step-num">2</div><h3>Claim</h3><p>Someone nearby claims it. You're notified instantly and given their contact.</p></div>
+        <div class="step"><div class="step-num">3</div><h3>Collect</h3><p>Hand it over. Mark it collected &mdash; and it counts toward what didn't get dumped.</p></div>
+      </div>
+    </section>`;
+}
+
+function filteredListings() {
+  return listings.filter(l => {
+    if (browseState.category && l.category !== browseState.category) return false;
+    if (browseState.status !== "all" && l.status !== browseState.status) return false;
+    if (browseState.search && !l.title.toLowerCase().includes(browseState.search.toLowerCase())) return false;
+    return true;
+  });
+}
+
+function browseGridHtml() {
+  const results = filteredListings();
+  if (results.length === 0) return `<div class="empty-state">Nothing matches yet. Try clearing a filter.</div>`;
+  return `<div class="ticket-grid">${results.map(ticketCard).join("")}</div>`;
+}
+
+function updateBrowseGrid() {
+  const container = document.getElementById("browse-results");
+  const chipRow = document.getElementById("browse-chip-row");
+  if (container) container.innerHTML = browseGridHtml();
+  if (chipRow) {
+    chipRow.querySelectorAll(".chip").forEach(chip => {
+      chip.classList.toggle("chip-active", chip.dataset.cat === (browseState.category || ""));
+    });
+  }
+}
+
+function renderBrowse() {
+  return `
+    <div class="section">
+      <div class="section-head"><span class="section-eyebrow">BROWSE</span><h2>Find something useful</h2></div>
+      <div class="search-row">
+        <input id="browse-search-input" class="search-input" placeholder="Search by title..." value="${browseState.search}">
+        <select id="browse-status-select" class="select-input">
+          <option value="available" ${browseState.status === "available" ? "selected" : ""}>Available only</option>
+          <option value="all" ${browseState.status === "all" ? "selected" : ""}>All statuses</option>
+          <option value="claimed" ${browseState.status === "claimed" ? "selected" : ""}>Claimed</option>
+          <option value="collected" ${browseState.status === "collected" ? "selected" : ""}>Collected</option>
+        </select>
+      </div>
+      <div class="chip-row" id="browse-chip-row">
+        <button class="chip ${browseState.category === null ? "chip-active" : ""}" data-action="browse-set-cat" data-cat="">All</button>
+        ${CATEGORIES.map(c => `<button class="chip ${browseState.category === c.key ? "chip-active" : ""}" data-action="browse-set-cat" data-cat="${c.key}"><span class="chip-swatch">${c.tag}</span>${c.label}</button>`).join("")}
+      </div>
+      <div id="browse-results">${browseGridHtml()}</div>
+    </div>`;
+}
+
+function renderDetail() {
+  const l = listings.find(x => x.id === state.selectedId);
+  if (!l) return `<div class="section">Listing not found.</div>`;
+  const m = catMeta(l.category);
+  const estKg = m.avgKg * l.qtyNum;
+  const bg = l.photoUrl ? `style="background-image:url('${l.photoUrl}')"` : "";
+
+  let actions = "";
+  if (l.status === "available") actions = `<button class="btn btn-primary" data-action="claim" data-id="${l.id}">Claim this</button>`;
+  else if (l.status === "claimed") actions = `<button class="btn btn-outline-dark" data-action="collect" data-id="${l.id}">Mark as collected</button>`;
+  else actions = `<div class="collected-note">${ICON.check} This item was collected &mdash; est. ${estKg}kg diverted.</div>`;
+
+  return `
+    <div class="section detail-section">
+      <button class="back-link" data-action="nav-browse">${ICON.back} Back</button>
+      <div class="detail-card">
+        <div class="detail-photo" ${bg}>${l.photoUrl ? "" : `<span>${m.tag}</span>`}${stampBadge(l.status)}</div>
+        <div class="detail-body">
+          ${catTag(l.category)}
+          <h1 class="detail-title">${l.title}</h1>
+          <p class="detail-desc">${l.description}</p>
+          <div class="detail-facts">
+            <div><span class="fact-label">Quantity</span>${l.qtyLabel}</div>
+            <div><span class="fact-label">Condition</span>${l.condition}</div>
+            <div><span class="fact-label">Location</span>${l.location}</div>
+            <div><span class="fact-label">Posted</span>${timeAgo(l.postedAt)}</div>
+            <div><span class="fact-label">Est. weight</span>${estKg}kg</div>
+            <div><span class="fact-label">Posted by</span>${l.posterName} ${l.accountType === "organization" ? "(org)" : ""}</div>
+          </div>
+          <div class="detail-actions">${actions}</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderPost() {
+  postPhotoDataUrl = null;
+  return `
+    <div class="section">
+      <div class="section-head"><span class="section-eyebrow">POST AN ITEM</span><h2>What are you giving away?</h2></div>
+      <div class="form-card">
+        <label class="field"><span>Photo</span>
+          <div id="dropzone" class="dropzone">
+            ${ICON.upload}
+            <div class="dropzone-text">Click to upload or drag & drop</div>
+            <div class="dropzone-sub">PNG or JPG, shown as a preview only in this mockup</div>
+          </div>
+          <input type="file" id="photo-input" accept="image/*" style="display:none">
+        </label>
+        <label class="field"><span>Title</span><input id="f-title" placeholder="e.g. 3 office chairs, minor wear"></label>
+        <label class="field"><span>Category</span>
+          <select id="f-category">${CATEGORIES.map(c => `<option value="${c.key}">${c.label}</option>`).join("")}</select>
+        </label>
+        <div class="field-row">
+          <label class="field"><span>Quantity label</span><input id="f-qtylabel" placeholder="e.g. 3 units, 40kg"></label>
+          <label class="field"><span>Quantity (numeric)</span><input id="f-qtynum" type="number" min="1" value="1"></label>
+        </div>
+        <label class="field"><span>Condition</span><input id="f-condition" placeholder="e.g. Used - good"></label>
+        <label class="field"><span>Location</span><input id="f-location" placeholder="e.g. Kisumu, Milimani"></label>
+        <label class="field"><span>Description</span><textarea id="f-description" rows="3" placeholder="Anything a claimant should know"></textarea></label>
+        <div class="detail-actions">
+          <button class="btn btn-primary" id="submit-post-btn" data-action="submit-post">Post listing</button>
+          <button class="btn btn-outline-dark" data-action="nav-home">Cancel</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderAuth() {
+  const mode = state.authMode;
+  return `
+    <div class="section">
+      <div class="section-head"><span class="section-eyebrow">${mode === "login" ? "LOG IN" : "REGISTER"}</span><h2>${mode === "login" ? "Welcome back" : "Create an account"}</h2></div>
+      <div class="form-card auth-card">
+        ${mode === "register" ? `<label class="field"><span>Name</span><input placeholder="Your name or organization name"></label>` : ""}
+        <label class="field"><span>Email</span><input type="email" placeholder="you@example.com"></label>
+        <label class="field"><span>Password</span><input type="password" placeholder="********"></label>
+        ${mode === "register" ? `
+        <label class="field"><span>Account type</span>
+          <div class="toggle-row">
+            <button type="button" class="toggle-btn toggle-active" id="toggle-individual" data-action="toggle-account" data-type="individual">Individual</button>
+            <button type="button" class="toggle-btn" id="toggle-organization" data-action="toggle-account" data-type="organization">Organization</button>
+          </div>
+        </label>` : ""}
+        <div class="detail-actions">
+          <button class="btn btn-primary" data-action="submit-auth">${mode === "login" ? "Log in" : "Create account"}</button>
+        </div>
+        <p class="auth-switch">${mode === "login" ? "New here?" : "Already have an account?"} <button class="link-btn" data-action="switch-auth">${mode === "login" ? "Register" : "Log in"}</button></p>
+      </div>
+    </div>`;
+}
+
+/* ============================================================
+   Navigation / render dispatch
+============================================================ */
+function renderPage() {
+  const el = document.getElementById("page-content");
+  el.classList.remove("fade");
+  void el.offsetWidth;
+  switch (state.page) {
+    case "landing": el.innerHTML = renderLanding(); break;
+    case "browse": el.innerHTML = renderBrowse(); afterRenderBrowse(); break;
+    case "detail": el.innerHTML = renderDetail(); break;
+    case "post": el.innerHTML = renderPost(); afterRenderPost(); break;
+    case "login": el.innerHTML = renderAuth(); break;
+  }
+  updateNavActive();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function updateNavActive() {
+  document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
+  const map = { landing: "nav-home", browse: "nav-browse", post: "nav-post" };
+  const id = map[state.page];
+  if (id) document.getElementById(id)?.classList.add("active");
+}
+
+function navigateTo(page) { state.page = page; renderPage(); }
+
+function afterRenderBrowse() {
+  document.getElementById("browse-search-input").addEventListener("input", e => {
+    browseState.search = e.target.value;
+    updateBrowseGrid();
+  });
+  document.getElementById("browse-status-select").addEventListener("change", e => {
+    browseState.status = e.target.value;
+    updateBrowseGrid();
+  });
+}
+
+function afterRenderPost() {
+  const dropzone = document.getElementById("dropzone");
+  const fileInput = document.getElementById("photo-input");
+  dropzone.addEventListener("click", () => fileInput.click());
+  dropzone.addEventListener("dragover", e => { e.preventDefault(); dropzone.classList.add("dragover"); });
+  dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
+  dropzone.addEventListener("drop", e => {
+    e.preventDefault();
+    dropzone.classList.remove("dragover");
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) handlePhotoFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener("change", e => {
+    if (e.target.files && e.target.files[0]) handlePhotoFile(e.target.files[0]);
+  });
+}
+
+function handlePhotoFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    postPhotoDataUrl = e.target.result;
+    const dropzone = document.getElementById("dropzone");
+    dropzone.outerHTML = `
+      <div class="photo-preview-wrap" id="dropzone">
+        <img src="${postPhotoDataUrl}" alt="Preview">
+        <button type="button" class="photo-remove-btn" data-action="remove-photo">${ICON.close}</button>
+      </div>`;
+  };
+  reader.readAsDataURL(file);
+}
+
+function removePhoto() {
+  postPhotoDataUrl = null;
+  const dropzone = document.getElementById("dropzone");
+  dropzone.outerHTML = `
+    <div id="dropzone" class="dropzone">
+      ${ICON.upload}
+      <div class="dropzone-text">Click to upload or drag & drop</div>
+      <div class="dropzone-sub">PNG or JPG, shown as a preview only in this mockup</div>
+    </div>`;
+  afterRenderPost();
+}
+
+/* ============================================================
+   Actions
+============================================================ */
+function openDetail(id) { state.selectedId = id; navigateTo("detail"); }
+
+function claimListing(id) {
+  const l = listings.find(x => x.id === id);
+  if (!l) return;
+  if (l.status !== "available") { showToast("Sorry — this was just claimed by someone else."); return; }
+  l.status = "claimed";
+  showToast("Claimed! Contact details would be shared here.");
+  renderPage();
+}
+
+function collectListing(id) {
+  const l = listings.find(x => x.id === id);
+  if (!l || l.status !== "claimed") return;
+  l.status = "collected";
+  const m = catMeta(l.category);
+  showToast(`Marked collected — ~${m.avgKg * l.qtyNum}kg diverted.`);
+  renderPage();
+}
+
+function submitPost() {
+  const title = document.getElementById("f-title").value.trim();
+  const location = document.getElementById("f-location").value.trim();
+  const qtyLabel = document.getElementById("f-qtylabel").value.trim();
+  if (!title || !location || !qtyLabel) {
+    showToast("Please fill in title, quantity label, and location.");
+    return;
+  }
+  const listing = {
+    id: nextId++,
+    title,
+    category: document.getElementById("f-category").value,
+    qtyLabel,
+    qtyNum: Number(document.getElementById("f-qtynum").value) || 1,
+    condition: document.getElementById("f-condition").value.trim() || "Not specified",
+    location,
+    description: document.getElementById("f-description").value.trim() || "No extra details given.",
+    status: "available",
+    posterName: "You",
+    accountType: "individual",
+    postedAt: new Date().toISOString(),
+    photoUrl: postPhotoDataUrl,
+  };
+  listings.unshift(listing);
+  showToast("Listing posted.");
+  openDetail(listing.id);
+}
+
+let selectedAccountType = "individual";
+function submitAuth() {
+  showToast("Mock only — no backend wired up yet.");
+  navigateTo("landing");
+}
+
+/* ============================================================
+   Event delegation
+============================================================ */
+document.addEventListener("click", e => {
+  const t = e.target.closest("[data-action]");
+  if (!t) return;
+  const action = t.dataset.action;
+  switch (action) {
+    case "nav-home": navigateTo("landing"); break;
+    case "nav-browse": navigateTo("browse"); break;
+    case "nav-post": navigateTo("post"); break;
+    case "open-login": state.authMode = "login"; navigateTo("login"); break;
+    case "open-register": state.authMode = "register"; navigateTo("login"); break;
+    case "switch-auth": state.authMode = state.authMode === "login" ? "register" : "login"; navigateTo("login"); break;
+    case "open-detail": openDetail(Number(t.dataset.id)); break;
+    case "claim": claimListing(Number(t.dataset.id)); break;
+    case "collect": collectListing(Number(t.dataset.id)); break;
+    case "browse-set-cat": browseState.category = t.dataset.cat || null; updateBrowseGrid(); break;
+    case "filter-and-browse": browseState.category = t.dataset.cat || null; navigateTo("browse"); break;
+    case "submit-post": submitPost(); break;
+    case "submit-auth": submitAuth(); break;
+    case "remove-photo": removePhoto(); break;
+    case "toggle-account":
+      selectedAccountType = t.dataset.type;
+      document.getElementById("toggle-individual").classList.toggle("toggle-active", selectedAccountType === "individual");
+      document.getElementById("toggle-organization").classList.toggle("toggle-active", selectedAccountType === "organization");
+      break;
+  }
+});
+
+/* ============================================================
+   Init
+============================================================ */
+function init() {
+  document.getElementById("app").innerHTML = `
+    <nav class="topnav">
+      <button class="brand" data-action="nav-home"><span class="brand-mark">WT</span><span class="brand-name">DumpTrade</span></button>
+      <div class="nav-links">
+        <button class="nav-btn" id="nav-home" data-action="nav-home">Home</button>
+        <button class="nav-btn" id="nav-browse" data-action="nav-browse">Browse</button>
+        <button class="nav-btn" id="nav-post" data-action="nav-post">Post an item</button>
+      </div>
+      <div class="nav-auth">
+        <button class="btn btn-outline" data-action="open-login">Log in</button>
+        <button class="btn btn-primary" data-action="open-register">Register</button>
+      </div>
+    </nav>
+    <div id="page-content"></div>
+  `;
+  renderPage();
+}
+init();
+</script>
+</body>
+</html>
