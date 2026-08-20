@@ -85,26 +85,38 @@ Pick based on team familiarity — speed matters more than novelty in a hackatho
 ## 6. Project Structure (proposed)
 
 ```
-wastetrade/
+dumptrade/
 ├── frontend/
-│   ├── src/
-│   │   ├── pages/          # Home, Browse, PostItem, ListingDetail, Login, Register, Profile
-│   │   ├── components/     # Navbar, ListingCard, ClaimButton, CategoryFilter, ImpactCounter
-│   │   ├── hooks/
-│   │   ├── api/            # API client functions
-│   │   └── App.tsx
-│   └── package.json
+│   ├── index.html           # Landing page
+│   ├── browse.html          # Browse/search page
+│   ├── listing.html         # Listing detail page
+│   ├── post.html            # Post an item page
+│   ├── login.html           # Login page
+│   ├── register.html        # Register page
+│   ├── css/
+│   │   └── styles.css       # Shared design tokens + component styles
+│   ├── js/
+│   │   ├── api.js           # Fetch calls to the backend
+│   │   ├── listings.js       # Rendering/filtering logic for cards
+│   │   ├── claim.js          # Claim/collect button logic
+│   │   └── auth.js           # Login/register form handling
+│   └── assets/
+│       └── icons/
 ├── backend/
-│   ├── handlers/           # auth, listings, claims, users
-│   ├── models/              # User, Listing, Claim
-│   ├── db/                  # schema, migrations
-│   ├── middleware/          # auth middleware
+│   ├── handlers/            # auth, listings, claims, users
+│   ├── models/               # User, Listing, Claim
+│   ├── db/                   # schema, migrations
+│   ├── middleware/           # auth middleware
 │   └── main.go / server.js
 ├── docs/
 │   ├── wireframes/
 │   └── pitch-deck/
 └── README.md
 ```
+Since there's no build step, each HTML page can pull in the same `css/styles.css` and only the
+JS files it needs — keeps things simple for a 5-person team working in parallel without merge
+conflicts in a bundler config.
+
 
 ## 7. Core Data Model (draft)
 
