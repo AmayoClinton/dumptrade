@@ -1,0 +1,9 @@
+.go-cache/
+.env
+backend/server
+*.exe
+*.dll
+*.so
+*.dylib
+/vendor/
+.DS_Store
