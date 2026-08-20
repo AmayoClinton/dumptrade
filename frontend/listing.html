@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Listing &mdash; DumpTrade</title>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<div class="blob blob-1"></div>
+<div class="blob blob-2"></div>
+
+<nav class="topnav">
+  <a class="brand" href="index.html"><span class="brand-mark">DT</span><span class="brand-name">DumpTrade</span></a>
+  <div class="nav-links">
+    <a class="nav-btn" href="index.html">Home</a>
+    <a class="nav-btn active" href="browse.html">Browse</a>
+    <a class="nav-btn" href="post.html">Post an item</a>
+  </div>
+  <div class="nav-auth">
+    <a class="btn btn-outline" href="login.html">Log in</a>
+    <a class="btn btn-primary" href="register.html">Register</a>
+  </div>
+</nav>
+
+<main>
+  <div class="section detail-section">
+    <a class="back-link" href="browse.html">&larr; Back</a>
+    <div id="detail-container"></div>
+  </div>
+</main>
+
+<script src="js/api.js"></script>
+<script src="js/listings.js"></script>
+<script src="js/claim.js"></script>
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const id = Number(params.get("id"));
+  const listing = apiGetListingById(id);
+  const container = document.getElementById("detail-container");
+
+  if (listing) {
+    container.innerHTML = detailHtml(listing);
+  } else {
+    container.innerHTML = `<div class="empty-state">Listing not found. It may have been removed. <br><a class="btn btn-primary" style="margin-top:16px;" href="browse.html">Back to Browse</a></div>`;
+  }
+</script>
+</body>
+</html>
