@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Browse &mdash; DumpTrade</title>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<div class="blob blob-1"></div>
+<div class="blob blob-2"></div>
+
+<nav class="topnav">
+  <a class="brand" href="index.html"><span class="brand-mark">DT</span><span class="brand-name">DumpTrade</span></a>
+  <div class="nav-links">
+    <a class="nav-btn" href="index.html">Home</a>
+    <a class="nav-btn active" href="browse.html">Browse</a>
+    <a class="nav-btn" href="post.html">Post an item</a>
+  </div>
+  <div class="nav-auth">
+    <a class="btn btn-outline" href="login.html">Log in</a>
+    <a class="btn btn-primary" href="register.html">Register</a>
+  </div>
+</nav>
+
+<main>
+  <div class="section">
+    <div class="section-head"><span class="section-eyebrow">BROWSE</span><h2>Find something useful</h2></div>
+
+    <div class="search-row">
+      <input id="search-input" class="search-input" placeholder="Search by title...">
+      <div class="filter-group">
+        <label class="filter-label" for="location-select">Location</label>
+        <select id="location-select" class="select-input">
+          <option value="">All locations</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label class="filter-label" for="status-select">Status</label>
+        <select id="status-select" class="select-input">
+          <option value="available">Available only</option>
+          <option value="all">All statuses</option>
+          <option value="claimed">Claimed</option>
+          <option value="collected">Collected</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="chip-row" id="category-chip-row"></div>
+
+    <div id="results"></div>
+  </div>
+</main>
+
+<script src="js/api.js"></script>
+<script src="js/listings.js"></script>
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const filters = {
+    category: params.get("category") || null,
+    status: "available",
+    city: "",
+    search: "",
+  };
+
+  // Populate location dropdown from listings actually on the platform.
+  const locationSelect = document.getElementById("location-select");
+  apiGetCities().forEach(city => {
+    const opt = document.createElement("option");
+    opt.value = city;
+    opt.textContent = city;
+    locationSelect.appendChild(opt);
+  });
+
+  function renderChips() {
+    const row = document.getElementById("category-chip-row");
+    const chips = [`<button class="chip ${!filters.category ? "chip-active" : ""}" data-cat="">All</button>`]
+      .concat(CATEGORIES.map(c => `<button class="chip ${filters.category === c.key ? "chip-active" : ""}" data-cat="${c.key}"><span class="chip-swatch">${c.tag}</span>${c.label}</button>`));
+    row.innerHTML = chips.join("");
+    row.querySelectorAll(".chip").forEach(chip => {
+      chip.addEventListener("click", () => {
+        filters.category = chip.dataset.cat || null;
+        renderChips();
+        renderResults();
+      });
+    });
+  }
+
+  function renderResults() {
+    document.getElementById("results").innerHTML = ticketGridHtml(apiGetListings(filters));
+  }
+
+  document.getElementById("search-input").addEventListener("input", e => {
+    filters.search = e.target.value;
+    renderResults();
+  });
+  document.getElementById("location-select").addEventListener("change", e => {
+    filters.city = e.target.value;
+    renderResults();
+  });
+  document.getElementById("status-select").addEventListener("change", e => {
+    filters.status = e.target.value;
+    renderResults();
+  });
+
+  renderChips();
+  renderResults();
+</script>
+</body>
+</html>
