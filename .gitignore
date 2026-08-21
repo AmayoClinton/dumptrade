@@ -1,9 +1,6 @@
-.go-cache/
+node_modules/
 .env
-backend/server
-*.exe
-*.dll
-*.so
-*.dylib
-/vendor/
+.env.local
+.vercel/
+*.log
 .DS_Store

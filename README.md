@@ -1,55 +1,74 @@
-# DumpTrade
+# Dump Trade
 
-Give what you don't need. Take what you do. DumpTrade connects households,
+Give what you don't need. Take what you do. **Dump Trade** connects households,
 workshops and industries so unwanted material finds its next use instead of a
-dumpsite or a fire — and it gives the people who clear waste a public,
-verifiable track record.
+dumpsite or a fire — and it gives the people who clear waste a public, verifiable
+track record.
 
-This repo is a Go (Gin) + Postgres backend with a no-build vanilla
-HTML/CSS/JS frontend. The frontend talks to the backend over `fetch`-style
-calls in `frontend/js/api.js`; when the backend is unreachable it falls back
-to an in-browser mock so the site still demos offline.
+The icon mark is **DT**.
+
+This repo is a **JavaScript (Node.js + Express)** backend with a no-build vanilla
+HTML/CSS/JS frontend. The frontend talks to the backend over `fetch`-style calls in
+`frontend/js/api.js`; when the backend is unreachable it falls back to an
+in-browser mock so the site still demos offline.
 
 ## Project layout
 
 ```
-backend/
-  main.go                 # router, static files, route wiring
-  models/                 # User, Listing, Claim, + engagement types
-  handlers/               # auth, listings, activities, stories, disposers,
-                           #   support, verify, uploads + postgres stores
-  db/                     # connection pool, idempotent migrations, seeding
-  middleware/             # JWT auth
+api/
+  index.js              # Express app: CORS, body handling, schema gate, routes
+  _lib/
+    db.js               # Postgres pool + lazy, idempotent schema (migrate + seed)
+    schema.js           # DDL (tables, enums, indexes) + seed data
+    auth.js             # JWT issue/verify helpers
+    http.js             # JSON response helpers
+    mappers.js          # row <-> API shape mapping
+    routes/             # users, listings, activities, stories, disposers,
+                        #   support, verify, feed, uploads
 frontend/
   index.html  browse.html  post.html  listing.html
   login.html  register.html
   become-disposer.html  disposer.html  activity.html  story.html
-  css/styles.css          # existing design system (do not edit)
-  css/engagement.css      # additive styles for new features
-  js/api.js               # backend-or-mock data layer
-  js/listings.js          # card/detail renderers (shared)
+  css/styles.css        # existing design system (do not edit)
+  css/engagement.css    # additive styles for new features
+  js/api.js             # backend-or-mock data layer
+  js/listings.js        # card/detail renderers (shared)
   js/browse-engagement.js js/post-types.js js/feed.js
   js/disposer-directory.js js/disposer.js js/become-disposer.js
   js/support.js js/verify.js js/catalogue.js js/claim.js js/post.js js/auth.js
-  assets/uploads/         # user-uploaded images (gitignored)
-Project.Rmd              # original project overview / hackathon plan
+  assets/uploads/       # user-uploaded images (gitignored)
+Project.Rmd             # original project overview / hackathon plan
 ```
 
 ## Run it
 
-### Backend
-1. Set `DATABASE_URL` (a Postgres/Neon connection string) in `backend/.env`.
-2. From `backend/`: `go run .` (or `go build ./...`). Migrations and seed
-   data are applied automatically on startup. Serves on `:8080` (override with
-   `PORT`).
-3. The API is mounted under `/api`. Frontend static files are served from the
-   backend root (e.g. `/browse.html`), so you can open the app directly at
-   `http://localhost:8080/`.
+### Prerequisites
+- Node.js >= 18
+- A Postgres database (e.g. Vercel Postgres / Neon) — set `POSTGRES_URL`
+- (Optional) Vercel Blob for image uploads — set `BLOB_READ_WRITE_TOKEN`
+- `JWT_SECRET` for signing auth tokens (a default is used if unset)
+
+### Locally (one command)
+From the repo root:
+
+```bash
+npm install
+cp .env.local.example .env.local   # fill in POSTGRES_URL / JWT_SECRET / BLOB token
+npm start                          # serves the API + static frontend on :8080
+```
+
+Open <http://localhost:8080/>. The schema (tables, enums, indexes) and seed data
+are applied lazily on the first request when `POSTGRES_URL` is configured.
 
 ### Frontend only (no DB)
 Open any `frontend/*.html` via a static server (e.g. `python3 -m http.server`
 from `frontend/`). With no backend reachable, `api.js` serves seed data from
 memory so every screen still renders.
+
+### On Vercel
+`vercel.json` rewrites `/api/*` to `api/index.js` (a single Function) and serves
+the `frontend/` directory as static assets. Set `POSTGRES_URL`, `JWT_SECRET`, and
+`BLOB_READ_WRITE_TOKEN` in your Vercel project environment.
 
 ### Auth
 Register/login through the UI. The JWT is stored in `localStorage` and sent as
@@ -83,8 +102,8 @@ user; anonymous actions show a "Please log in first." prompt.
   transport, labour). "Show contact" unlocks the organizer's contact method;
   "I'll bring this" pledges; the recipient confirms receipt and the progress
   bar updates.
-- **Image uploads** — `POST /api/uploads` stores to `frontend/assets/uploads/`
-  and returns a path used for activity/story/before-after photos.
+- **Image uploads** — `POST /api/uploads` stores to Vercel Blob and returns a
+  public URL used for activity/story/before-after photos.
 
 ## API
 
@@ -119,7 +138,7 @@ All JSON. Protected routes require `Authorization: Bearer <token>`.
 | POST | `/api/support-pledges/:id/confirm` | ✓ (recipient) | |
 | POST | `/api/verifications` | ✓ | credits a disposer |
 | GET | `/api/feed` | – | `?limit=` merged feed |
-| POST | `/api/uploads` | – | multipart `file` → `/assets/uploads/...` |
+| POST | `/api/uploads` | – | multipart `file` → Vercel Blob URL |
 
 ## Data model (additive)
 
@@ -129,7 +148,7 @@ Existing `users`, `listings`, `claims` are unchanged in shape. New tables:
 `listings` table gained two nullable columns: `needs_disposer` (bool) and
 `disposer_note` (text). All migrations are idempotent (`CREATE ... IF NOT
 EXISTS` / `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`) and run from
-`db.Migrate()` + `db.MigrateEngagement()` on startup.
+`api/_lib/db.js` + `api/_lib/schema.js` on first request.
 
 ## Notes for contributors
 
@@ -139,3 +158,4 @@ EXISTS` / `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`) and run from
   copy are intentionally frozen. New features extend, they do not reimagine.
 - `frontend/js/api.js` is the single data boundary. Keep function names stable;
   pages depend on them being synchronous.
+- The backend is JavaScript (Express). There is no Go code in this repo.
