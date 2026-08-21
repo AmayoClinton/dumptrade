@@ -7,6 +7,10 @@
 
 let postPhotoDataUrl = null;
 
+if (!isAuthenticated()) {
+  window.location.replace("login.html");
+}
+
 document.getElementById("f-category").innerHTML = CATEGORIES.map(c => `<option value="${c.key}">${c.label}</option>`).join("");
 
 function initDropzone() {
