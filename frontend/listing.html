@@ -36,16 +36,25 @@
 <script src="js/auth.js"></script>
 <script src="js/claim.js"></script>
 <script>
-  const params = new URLSearchParams(window.location.search);
-  const id = Number(params.get("id"));
-  const listing = apiGetListingById(id);
-  const container = document.getElementById("detail-container");
+  async function initListing() {
+    const id = Number(new URLSearchParams(window.location.search).get("id"));
+    const container = document.getElementById("detail-container");
+    if (!Number.isInteger(id) || id <= 0) {
+      container.innerHTML = `<div class="empty-state">Listing not found.</div>`;
+      return;
+    }
 
-  if (listing) {
-    container.innerHTML = detailHtml(listing);
-  } else {
-    container.innerHTML = `<div class="empty-state">Listing not found. It may have been removed. <br><a class="btn btn-primary" style="margin-top:16px;" href="browse.html">Back to Browse</a></div>`;
+    try {
+      const listing = await apiGetListingById(id);
+      container.innerHTML = listing
+        ? detailHtml(listing)
+        : `<div class="empty-state">Listing not found. It may have been removed. <br><a class="btn btn-primary" style="margin-top:16px;" href="browse.html">Back to Browse</a></div>`;
+    } catch (error) {
+      container.innerHTML = `<div class="empty-state">${error.message}</div>`;
+    }
   }
+
+  initListing();
 </script>
 </body>
 </html>

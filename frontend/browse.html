@@ -63,50 +63,67 @@
     status: "available",
     city: "",
     search: "",
+    limit: 100,
   };
-
-  // Populate location dropdown from listings actually on the platform.
-  const locationSelect = document.getElementById("location-select");
-  apiGetCities().forEach(city => {
-    const opt = document.createElement("option");
-    opt.value = city;
-    opt.textContent = city;
-    locationSelect.appendChild(opt);
-  });
+  let latestRequest = 0;
 
   function renderChips() {
     const row = document.getElementById("category-chip-row");
     const chips = [`<button class="chip ${!filters.category ? "chip-active" : ""}" data-cat="">All</button>`]
-      .concat(CATEGORIES.map(c => `<button class="chip ${filters.category === c.key ? "chip-active" : ""}" data-cat="${c.key}"><span class="chip-swatch">${c.tag}</span>${c.label}</button>`));
+      .concat(CATEGORIES.map(category => `<button class="chip ${filters.category === category.key ? "chip-active" : ""}" data-cat="${category.key}"><span class="chip-swatch">${category.tag}</span>${category.label}</button>`));
     row.innerHTML = chips.join("");
     row.querySelectorAll(".chip").forEach(chip => {
       chip.addEventListener("click", () => {
         filters.category = chip.dataset.cat || null;
         renderChips();
-        renderResults();
+        void renderResults();
       });
     });
   }
 
-  function renderResults() {
-    document.getElementById("results").innerHTML = ticketGridHtml(apiGetListings(filters));
+  async function renderResults() {
+    const requestId = ++latestRequest;
+    const results = document.getElementById("results");
+    results.innerHTML = `<div class="empty-state">Loading listings...</div>`;
+    try {
+      const listings = await apiGetListings(filters);
+      if (requestId === latestRequest) results.innerHTML = ticketGridHtml(listings);
+    } catch (error) {
+      if (requestId === latestRequest) results.innerHTML = `<div class="empty-state">${error.message}</div>`;
+    }
   }
 
-  document.getElementById("search-input").addEventListener("input", e => {
-    filters.search = e.target.value;
-    renderResults();
+  document.getElementById("search-input").addEventListener("input", event => {
+    filters.search = event.target.value;
+    void renderResults();
   });
-  document.getElementById("location-select").addEventListener("change", e => {
-    filters.city = e.target.value;
-    renderResults();
+  document.getElementById("location-select").addEventListener("change", event => {
+    filters.city = event.target.value;
+    void renderResults();
   });
-  document.getElementById("status-select").addEventListener("change", e => {
-    filters.status = e.target.value;
-    renderResults();
+  document.getElementById("status-select").addEventListener("change", event => {
+    filters.status = event.target.value;
+    void renderResults();
   });
 
-  renderChips();
-  renderResults();
+  async function initBrowse() {
+    renderChips();
+    try {
+      const cities = await apiGetCities();
+      const locationSelect = document.getElementById("location-select");
+      cities.forEach(city => {
+        const option = document.createElement("option");
+        option.value = city;
+        option.textContent = city;
+        locationSelect.appendChild(option);
+      });
+    } catch (error) {
+      showToast(error.message);
+    }
+    await renderResults();
+  }
+
+  initBrowse();
 </script>
 </body>
 </html>

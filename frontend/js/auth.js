@@ -1,11 +1,11 @@
 /* ============================================================
    auth.js
-   Handles the login and register forms — real fetch() calls
+   Handles the login and register forms â€” real fetch() calls
    to the DumpTrade backend. Stores the JWT + user in
    localStorage so other pages (post.html, etc.) can use it.
 ============================================================ */
 
-const API_BASE = "/api";
+const AUTH_API_BASE = "/api";
 
 let selectedAccountType = "individual";
 
@@ -52,7 +52,7 @@ async function handleAuthSubmit(event) {
       const email = document.getElementById("reg-email").value;
       const password = document.getElementById("reg-password").value;
 
-      res = await fetch(`${API_BASE}/register`, {
+      res = await fetch(`${AUTH_API_BASE}/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, email, password, account_type: selectedAccountType }),
@@ -61,7 +61,7 @@ async function handleAuthSubmit(event) {
       const email = document.getElementById("login-email").value;
       const password = document.getElementById("login-password").value;
 
-      res = await fetch(`${API_BASE}/login`, {
+      res = await fetch(`${AUTH_API_BASE}/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),

@@ -1,24 +1,31 @@
-/* ============================================================
-   claim.js
-   Wires up the Claim / Mark as collected buttons on listing.html.
-   Calls the mock api.js functions, shows a toast, then re-renders
-   the detail card in place so the status updates immediately.
-============================================================ */
+/* Wires claim and collection actions to the authenticated API. */
 
-function handleClaim(id) {
-  const result = apiClaimListing(id);
-  showToast(result.message);
-  if (result.ok) rerenderDetail(id);
+async function handleClaim(id) {
+  try {
+    const result = await apiClaimListing(id);
+    showToast(result.message || "Listing claimed successfully.");
+    await rerenderDetail(id);
+  } catch (error) {
+    showToast(error.message);
+  }
 }
 
-function handleCollect(id) {
-  const result = apiCollectListing(id);
-  showToast(result.message);
-  if (result.ok) rerenderDetail(id);
+async function handleCollect(id) {
+  try {
+    const result = await apiCollectListing(id);
+    showToast(result.message || "Listing marked as collected.");
+    await rerenderDetail(id);
+  } catch (error) {
+    showToast(error.message);
+  }
 }
 
-function rerenderDetail(id) {
+async function rerenderDetail(id) {
   const container = document.getElementById("detail-container");
-  const listing = apiGetListingById(id);
-  if (container && listing) container.innerHTML = detailHtml(listing);
+  try {
+    const listing = await apiGetListingById(id);
+    if (container && listing) container.innerHTML = detailHtml(listing);
+  } catch (error) {
+    showToast(error.message);
+  }
 }

@@ -1,11 +1,7 @@
-/* ============================================================
-   post.js
-   Handles the post-an-item form: photo dropzone/preview via
-   FileReader, category dropdown population, and submission
-   into the mock api.js listings array.
-============================================================ */
+/* Handles the authenticated post-an-item flow and image preview. */
 
-let postPhotoDataUrl = null;
+let postPhotoFile = null;
+let postPreviewUrl = null;
 
 if (!isAuthenticated()) {
   window.location.replace("login.html");
@@ -17,44 +13,52 @@ function initDropzone() {
   const dropzone = document.getElementById("dropzone");
   const fileInput = document.getElementById("photo-input");
   dropzone.addEventListener("click", () => fileInput.click());
-  dropzone.addEventListener("dragover", e => { e.preventDefault(); dropzone.classList.add("dragover"); });
+  dropzone.addEventListener("dragover", event => { event.preventDefault(); dropzone.classList.add("dragover"); });
   dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
-  dropzone.addEventListener("drop", e => {
-    e.preventDefault();
+  dropzone.addEventListener("drop", event => {
+    event.preventDefault();
     dropzone.classList.remove("dragover");
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) handlePhotoFile(e.dataTransfer.files[0]);
+    if (event.dataTransfer.files[0]) handlePhotoFile(event.dataTransfer.files[0]);
   });
-  fileInput.addEventListener("change", e => {
-    if (e.target.files && e.target.files[0]) handlePhotoFile(e.target.files[0]);
+  fileInput.addEventListener("change", event => {
+    if (event.target.files[0]) handlePhotoFile(event.target.files[0]);
   });
 }
 
 function handlePhotoFile(file) {
-  const reader = new FileReader();
-  reader.onload = e => {
-    postPhotoDataUrl = e.target.result;
-    const dropzone = document.getElementById("dropzone");
-    dropzone.outerHTML = `
-      <div class="photo-preview-wrap" id="dropzone">
-        <img src="${postPhotoDataUrl}" alt="Preview">
-        <button type="button" class="photo-remove-btn" onclick="removePhoto()">${ICON.close}</button>
-      </div>`;
-  };
-  reader.readAsDataURL(file);
+  if (!file.type.startsWith("image/")) {
+    showToast("Please choose a PNG, JPG, GIF, or WebP image.");
+    return;
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    showToast("Photos must be 5 MB or smaller.");
+    return;
+  }
+
+  if (postPreviewUrl) URL.revokeObjectURL(postPreviewUrl);
+  postPhotoFile = file;
+  postPreviewUrl = URL.createObjectURL(file);
+  document.getElementById("dropzone").outerHTML = `
+    <div class="photo-preview-wrap" id="dropzone">
+      <img src="${postPreviewUrl}" alt="Selected photo preview">
+      <button type="button" class="photo-remove-btn" onclick="removePhoto()">${ICON.close}</button>
+    </div>`;
 }
 
 function removePhoto() {
-  postPhotoDataUrl = null;
+  if (postPreviewUrl) URL.revokeObjectURL(postPreviewUrl);
+  postPhotoFile = null;
+  postPreviewUrl = null;
   document.getElementById("dropzone").outerHTML = `
     <div id="dropzone" class="dropzone">
       ${ICON.upload}
-      <div class="dropzone-text">Click to upload or drag & drop</div>
-      <div class="dropzone-sub">PNG or JPG, shown as a preview only in this mockup</div>
+      <div class="dropzone-text">Click to upload or drag and drop</div>
+      <div class="dropzone-sub">PNG, JPG, GIF, or WebP up to 5 MB</div>
     </div>`;
   initDropzone();
 }
 
-function submitPost() {
+async function submitPost() {
   const title = document.getElementById("f-title").value.trim();
   const location = document.getElementById("f-location").value.trim();
   const qtyLabel = document.getElementById("f-qtylabel").value.trim();
@@ -62,17 +66,29 @@ function submitPost() {
     showToast("Please fill in title, quantity label, and location.");
     return;
   }
-  const listing = apiAddListing({
-    title,
-    category: document.getElementById("f-category").value,
-    qtyLabel,
-    qtyNum: Number(document.getElementById("f-qtynum").value) || 1,
-    condition: document.getElementById("f-condition").value.trim() || "Not specified",
-    location,
-    description: document.getElementById("f-description").value.trim() || "No extra details given.",
-    photoUrl: postPhotoDataUrl,
-  });
-  window.location.href = `listing.html?id=${listing.id}`;
+
+  const submitButton = document.querySelector(".detail-actions .btn-primary");
+  submitButton.disabled = true;
+  submitButton.textContent = "Posting...";
+
+  try {
+    const photoUrl = await apiUploadPhoto(postPhotoFile);
+    const listing = await apiCreateListing({
+      title,
+      category: document.getElementById("f-category").value,
+      qtyLabel,
+      qtyNum: Number(document.getElementById("f-qtynum").value) || 1,
+      condition: document.getElementById("f-condition").value.trim() || "Not specified",
+      location,
+      description: document.getElementById("f-description").value.trim() || "No extra details given.",
+      photoUrl,
+    });
+    window.location.href = `listing.html?id=${listing.id}`;
+  } catch (error) {
+    showToast(error.message);
+    submitButton.disabled = false;
+    submitButton.textContent = "Post listing";
+  }
 }
 
 initDropzone();
