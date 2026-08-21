@@ -64,6 +64,7 @@
 
 <script src="js/api.js"></script>
 <script src="js/listings.js"></script>
+<script src="js/auth.js"></script>
 <script>
   const available = apiGetListings({ status: "available" });
   const collected = apiGetListings({ status: "all" }).filter(l => l.status === "collected");

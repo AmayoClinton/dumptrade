@@ -20,6 +20,25 @@ function saveSession(token, user) {
   localStorage.setItem("dumptrade_user", JSON.stringify(user));
 }
 
+function isAuthenticated() {
+  return Boolean(localStorage.getItem("dumptrade_token"));
+}
+
+function logout() {
+  localStorage.removeItem("dumptrade_token");
+  localStorage.removeItem("dumptrade_user");
+  window.location.href = "index.html";
+}
+
+function renderAuthNavigation() {
+  const navAuth = document.querySelector(".nav-auth");
+  if (!navAuth) return;
+
+  navAuth.innerHTML = isAuthenticated()
+    ? `<button class="btn btn-outline" type="button" onclick="logout()">Log out</button>`
+    : `<a class="btn btn-outline" href="login.html">Log in</a>\n       <a class="btn btn-primary" href="register.html">Register</a>`;
+}
+
 async function handleAuthSubmit(event) {
   event.preventDefault();
 
@@ -63,3 +82,5 @@ async function handleAuthSubmit(event) {
     showToast("Could not reach the server. Is it running?");
   }
 }
+
+renderAuthNavigation();
