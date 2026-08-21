@@ -1,7 +1,7 @@
 /* ============================================================
    auth.js
    Handles the login and register forms — real fetch() calls
-   to the DumpTrade backend. Stores the JWT + user in
+   to the Dump Trade backend. Stores the JWT + user in
    localStorage so other pages (post.html, etc.) can use it.
 ============================================================ */
 

@@ -1,5 +1,5 @@
 ---
-Title: "DumpTrade — Project Overview"
+Title: "Dump Trade — Project Overview"
 subtitle: "Reducing dumping and burning through peer-to-peer and industrial waste redistribution"
 date: "`r format(Sys.Date(), '%B %d, %Y')`"
 output:
@@ -11,7 +11,7 @@ output:
 
 ## 1. Executive Summary
 
-DumpTrade is a web platform that lets individuals, businesses, and industries post materials
+Dump Trade is a web platform that lets individuals, businesses, and industries post materials
 they no longer need, so that others who could use them can claim them instead of the items
 being dumped, burned, or landfilled. The platform serves two overlapping needs:
 

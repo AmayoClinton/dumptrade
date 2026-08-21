@@ -49,7 +49,7 @@ function renderCatalogue(container) {
           <li><strong>Mixed / unknown construction</strong> &mdash; separate concrete, wood and metal before disposal; coated or treated material may need a specialist.</li>
           <li><strong>Paint, solvents, oils</strong> &mdash; keep sealed and hand to a hazardous-waste point; do not pour into drains or soil.</li>
         </ul>
-        <div class="cat-note">When in doubt, post it on DumpTrade with a clear description &mdash; someone nearby may have the right channel.</div>`,
+        <div class="cat-note">When in doubt, post it on Dump Trade with a clear description &mdash; someone nearby may have the right channel.</div>`,
     },
   ];
 

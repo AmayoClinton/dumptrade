@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * DumpTrade API — Express on Vercel.
+ * Dump Trade API — Express on Vercel.
  *
  * This is the only file under api/ that Vercel turns into a Function: every
  * request matching /api/* is rewritten here by vercel.json, and Express routes

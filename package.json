@@ -2,7 +2,7 @@
   "name": "dumptrade-api",
   "version": "1.0.0",
   "private": true,
-  "description": "DumpTrade REST API — Node.js + Express on Vercel, backed by Vercel Postgres and Vercel Blob.",
+  "description": "Dump Trade REST API — Node.js + Express on Vercel, backed by Vercel Postgres and Vercel Blob.",
   "license": "MIT",
   "main": "api/index.js",
   "scripts": {
