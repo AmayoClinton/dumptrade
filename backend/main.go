@@ -14,19 +14,21 @@ import (
 
 func main() {
 	db.LoadEnv()
-
 	if err := db.Connect(); err != nil {
 		log.Fatalf("Database connection failed: %v", err)
 	}
 	defer db.Close()
 
-	if err := db.Migrate(); err != nil {
-		log.Fatalf("Database migration failed: %v", err)
+	if os.Getenv("RUN_MIGRATIONS") != "false" {
+		if err := db.Migrate(); err != nil {
+			log.Fatalf("Database migration failed: %v", err)
+		}
 	}
-	if err := db.Seed(); err != nil {
-		log.Printf("Notice: DB seed skipped or failed: %v", err)
+	if os.Getenv("SEED_DEMO_DATA") != "false" {
+		if err := db.Seed(); err != nil {
+			log.Printf("Notice: DB seed skipped or failed: %v", err)
+		}
 	}
-	log.Println("Database connection pool established, migrations applied, and data seeded successfully")
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -36,17 +38,21 @@ func main() {
 	if jwtSecret == "" {
 		jwtSecret = "dumptrade-secret-key-12345"
 	}
+	frontendDir := "../frontend"
+	uploadDir := os.Getenv("UPLOAD_DIR")
+	if uploadDir == "" {
+		uploadDir = frontendDir + "/uploads"
+	}
 
 	userStore := handlers.NewPostgresUserStore()
 	listingStore := handlers.NewPostgresListingStore()
-
 	authHandler := handlers.NewAuthHandler(userStore, jwtSecret)
 	listingHandler := handlers.NewListingHandler(listingStore)
+	uploadHandler := handlers.NewUploadHandler(uploadDir)
 
 	router := gin.Default()
+	router.MaxMultipartMemory = 8 << 20
 	router.Use(middleware.CORS())
-
-	frontendDir := "../frontend"
 	if _, err := os.Stat(frontendDir); err == nil {
 		router.StaticFile("/", frontendDir+"/index.html")
 		router.StaticFile("/index.html", frontendDir+"/index.html")
@@ -57,6 +63,7 @@ func main() {
 		router.StaticFile("/register.html", frontendDir+"/register.html")
 		router.Static("/css", frontendDir+"/css")
 		router.Static("/js", frontendDir+"/js")
+		router.Static("/uploads", uploadDir)
 	}
 
 	api := router.Group("/api")
@@ -64,16 +71,15 @@ func main() {
 		api.GET("/health", func(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{"status": "ok", "service": "dumptrade-api"})
 		})
-
 		api.POST("/register", authHandler.Register)
 		api.POST("/login", authHandler.Login)
-
 		api.GET("/listings", listingHandler.GetListings)
 		api.GET("/listings/:id", listingHandler.GetListing)
 
 		protected := api.Group("")
 		protected.Use(middleware.AuthRequired([]byte(jwtSecret)))
 		{
+			protected.POST("/uploads", uploadHandler.Upload)
 			protected.POST("/listings", listingHandler.CreateListing)
 			protected.POST("/listings/:id/claim", listingHandler.ClaimListing)
 			protected.POST("/listings/:id/collect", listingHandler.MarkCollected)
