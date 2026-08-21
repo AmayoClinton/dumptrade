@@ -155,6 +155,8 @@ func Migrate() error {
 	CREATE INDEX IF NOT EXISTS idx_listings_category ON listings(category);
 	CREATE INDEX IF NOT EXISTS idx_listings_location ON listings(location);
 	CREATE INDEX IF NOT EXISTS idx_claims_listing_id ON claims(listing_id);
+	CREATE INDEX IF NOT EXISTS idx_listings_created_at ON listings(created_at DESC);
+	CREATE INDEX IF NOT EXISTS idx_listings_category_status_created_at ON listings(category, status, created_at DESC);
 	`
 
 	_, err := Pool.Exec(ctx, migrationSQL)
@@ -228,7 +230,7 @@ func Seed() error {
 		{orgID, "Offcut timber, mixed sizes", "construction", "Leftover from cabinet production. Good for small joinery or a firewood alternative.", "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT9Rz3jYcg5Qia8Am2p36MQJP1149evIrNEYSMFAxtIlw&s=10", "~40kg", 4, "New offcuts", "Nairobi, Industrial Area", "available"},
 		{userID, "Broken laptops (for parts)", "ewaste", "Screens cracked, boards may still work. Good for a repair shop or e-waste recycler.", "", "6 units", 6, "Non-functional", "Kisumu, CBD", "claimed"},
 		{orgID, "Fabric offcuts, assorted colors", "textiles", "Cotton and ankara offcuts from tailoring. Great for patchwork or stuffing.", "https://www.blackbirdfabrics.com/cdn/shop/articles/Untitled-1_0336d11c-814e-4f77-b609-d07f8a48b265.jpg?v=1682380353&width=4864", "5 bags", 5, "New offcuts", "Nairobi, Gikomba", "available"},
-		{orgID, "Spent coffee grounds, daily", "organic", "Recurring listing — great for composting or mushroom substrate. Collect daily after 6pm.", "", "10kg / day", 5, "Fresh daily", "Kisumu, Milimani", "available"},
+		{orgID, "Spent coffee grounds, daily", "organic", "Recurring listing â€” great for composting or mushroom substrate. Collect daily after 6pm.", "", "10kg / day", 5, "Fresh daily", "Kisumu, Milimani", "available"},
 		{userID, "Dining table, one leg wobbly", "furniture", "Solid wood, just needs a leg brace.", "", "1 unit", 1, "Used - fair", "Kisumu, Nyalenda", "collected"},
 		{orgID, "PET bottle bales", "plastic", "Baled PET from packaging line. Ready for a recycler with pickup capacity.", "", "200kg", 20, "Sorted, clean", "Nairobi, Industrial Area", "available"},
 		{orgID, "Metal shavings from lathe work", "industrial", "Steel and aluminum shavings, unsorted. Good for scrap buyers.", "", "80kg", 5, "Mixed alloy", "Kisumu, Kibos Road", "available"},

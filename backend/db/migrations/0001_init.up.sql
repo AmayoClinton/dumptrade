@@ -45,3 +45,5 @@ CREATE INDEX idx_listings_status ON listings(status);
 CREATE INDEX idx_listings_category ON listings(category);
 CREATE INDEX idx_listings_location ON listings(location);
 CREATE INDEX idx_claims_listing_id ON claims(listing_id);
+CREATE INDEX idx_listings_created_at ON listings(created_at DESC);
+CREATE INDEX idx_listings_category_status_created_at ON listings(category, status, created_at DESC);
