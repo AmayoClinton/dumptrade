@@ -30,7 +30,7 @@ function _detailItemKind(item) {
   return null;
 }
 
-function markVerifiedCleared() {
+async function markVerifiedCleared() {
   const item = window._currentDetailItem || null;
 
   const kgRaw = window.prompt("Kg diverted for this clearance?", "50");
@@ -55,7 +55,7 @@ function markVerifiedCleared() {
     return;
   }
 
-  const res = apiCreateVerification(fields);
+  const res = await apiCreateVerification(fields);
   if (!res) return; // api.js already toasted (e.g. "Please log in first.")
   if (res.ok === false) {
     showToast(res.message || "Could not record the verification.");

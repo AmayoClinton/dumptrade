@@ -23,7 +23,7 @@ window.addEventListener('DOMContentLoaded', () => {
   _wireToggle('d-available', v => { _dAvailable = (v === 'on'); });
 });
 
-function submitDisposer() {
+async function submitDisposer() {
   const service_area = document.getElementById('d-area').value.trim();
   const contact_value = document.getElementById('d-contact').value.trim();
   const bio = document.getElementById('d-bio').value.trim();
@@ -33,7 +33,7 @@ function submitDisposer() {
     return;
   }
 
-  const profile = apiCreateDisposer({
+  const profile = await apiCreateDisposer({
     service_area,
     contact_method: _dMethod,
     contact_value,

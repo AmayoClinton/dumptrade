@@ -38,6 +38,7 @@
 <script src="js/verify.js"></script>
 <script src="js/support.js"></script>
 <script>
+  (async () => {
   const params = new URLSearchParams(window.location.search);
   const id = Number(params.get('id'));
   const container = document.getElementById('detail-container');
@@ -45,7 +46,7 @@
   let item = null;
 
   if (typeof apiGetActivityById === 'function') {
-    item = apiGetActivityById(id);
+    item = await apiGetActivityById(id);
     if (item) {
       if (typeof activityDetailHtml === 'function') container.innerHTML = activityDetailHtml(item);
       else container.innerHTML = `<div class="detail-card"><div class="detail-body"><h1 class="detail-title">${item.title || 'Activity'}</h1><p class="detail-desc">${item.description || ''}</p></div></div>`;
@@ -57,6 +58,7 @@
     if (typeof renderDetailAddons === 'function') renderDetailAddons(addons, item);
     if (typeof renderSupportForParent === 'function') renderSupportForParent(addons, 'activity', id);
   }
+  })().catch(err => console.error("[activity] load failed:", err));
 </script>
 </body>
 </html>

@@ -2,18 +2,12 @@
    api.js
    REAL backend calls with a mock fallback.
 
-   Every public api* function now talks to the Go/Gin backend at
-   /api/... and falls back to the in-memory mock (kept below, with
-   _mock* names) whenever the backend is unreachable or errors out.
-   That means the site still demos fine with the server switched off.
-
-   WHY SYNCHRONOUS XHR: several callers do
-       const x = apiGetListings(...)   // index.html, browse.html
-       const y = apiGetFeed(9)         // feed.js renderFeed
-   during page load and use the value immediately. Returning a
-   Promise would break all of them, so every call uses
-   XMLHttpRequest with open(method, url, false) — a deliberate
-   hackathon trade-off, not a pattern to keep in production.
+   Every public api* function is async: it talks to the Dump Trade
+   Express backend at /api/... and falls back to the in-memory mock
+   (kept below, with _mock* names) whenever the backend is
+   unreachable or errors out. The site still demos fine with the
+   server switched off, and the UI never freezes while a request is
+   in flight because the transport is non-blocking fetch().
 
    NOTE ON PERSISTENCE (mock path only): session-created changes
    (new listings, claim/collect status) are cached in sessionStorage;
@@ -40,42 +34,59 @@ function apiToast(msg) {
   else if (typeof console !== 'undefined') console.warn(msg);
 }
 
-/* Synchronous request. Returns parsed JSON on 2xx, throws otherwise.
-   Multipart uploads build their own XHR (see uploadPhoto). */
-function syncXHR(method, path, body, requireAuth) {
-  const xhr = new XMLHttpRequest();
-  xhr.open(method, path, false); // false === synchronous (see header note)
-  const hasBody = body !== null && body !== undefined;
-  if (hasBody) xhr.setRequestHeader('Content-Type', 'application/json');
-  if (requireAuth) {
-    const tok = apiToken();
-    if (tok) xhr.setRequestHeader('Authorization', 'Bearer ' + tok);
-  }
-  xhr.send(hasBody ? JSON.stringify(body) : null);
+/* Async transport. Returns a Promise of parsed JSON on 2xx, throws on
+   anything else. Uses fetch with a hard timeout (AbortController) so a slow
+   or unreachable backend can never freeze the page — the UI stays
+   responsive and the caller falls back to the in-memory mock. */
+const _REQ_TIMEOUT_MS = 8000;
 
-  if (xhr.status >= 200 && xhr.status < 300) {
-    if (!xhr.responseText) return null;
-    try { return JSON.parse(xhr.responseText); } catch (e) { return null; }
+async function requestXHR(method, path, body, requireAuth) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), _REQ_TIMEOUT_MS);
+  try {
+    const headers = {};
+    const hasBody = body !== null && body !== undefined;
+    if (hasBody) headers['Content-Type'] = 'application/json';
+    if (requireAuth) {
+      const tok = apiToken();
+      if (tok) headers['Authorization'] = 'Bearer ' + tok;
+    }
+    const res = await fetch(path, {
+      method,
+      headers,
+      body: hasBody ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
+    });
+    if (res.status >= 200 && res.status < 300) {
+      const text = await res.text();
+      if (!text) return null;
+      try { return JSON.parse(text); } catch (e) { return null; }
+    }
+    const err = new Error('HTTP ' + res.status + ' ' + method + ' ' + path);
+    err.status = res.status;
+    try { err.body = await res.json(); } catch (e) { err.body = null; }
+    throw err;
+  } finally {
+    clearTimeout(timer);
   }
-
-  const err = new Error('HTTP ' + xhr.status + ' ' + method + ' ' + path);
-  err.status = xhr.status;
-  try { err.body = JSON.parse(xhr.responseText); } catch (e) { err.body = null; }
-  throw err;
 }
 
-/* Ping /api/health once per page load and cache the answer, so a
-   dead backend costs one failed request instead of one per call. */
-let _backendUpCache = null;
-function backendUp() {
-  if (_backendUpCache !== null) return _backendUpCache;
-  try {
-    const r = syncXHR('GET', '/api/health', null, false);
-    _backendUpCache = !!(r && r.status === 'ok');
-  } catch (e) {
-    _backendUpCache = false;
+/* Ping /api/health once per page load and cache the answer (as a Promise),
+   so a dead backend costs one failed request instead of one per call. The
+   health route is DB-free, so it answers fast even when the database is down. */
+let _backendUpPromise = null;
+async function backendUp() {
+  if (!_backendUpPromise) {
+    _backendUpPromise = (async () => {
+      try {
+        const r = await requestXHR('GET', '/api/health', null, false);
+        return !!(r && r.status === 'ok');
+      } catch (e) {
+        return false;
+      }
+    })();
   }
-  return _backendUpCache;
+  return _backendUpPromise;
 }
 
 /* True when we can make an authenticated call. Never throws: it
@@ -222,19 +233,18 @@ function normalizeFeedItem(b) {
 
 /* ---------- Photo upload (multipart, public endpoint) ----------
    Returns the hosted URL ("/assets/uploads/<file>") or null. */
-function uploadPhoto(file) {
+async function uploadPhoto(file) {
   if (!file) return null;
   try {
     const fd = new FormData();
     fd.append('file', file);
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', '/api/uploads', false);
+    const headers = {};
     const tok = apiToken();
-    if (tok) xhr.setRequestHeader('Authorization', 'Bearer ' + tok);
-    xhr.send(fd);
-    if (xhr.status >= 200 && xhr.status < 300) {
-      const res = JSON.parse(xhr.responseText);
-      return res && res.url ? res.url : null;
+    if (tok) headers['Authorization'] = 'Bearer ' + tok;
+    const res = await fetch('/api/uploads', { method: 'POST', headers, body: fd });
+    if (res.status >= 200 && res.status < 300) {
+      const data = await res.json();
+      return data && data.url ? data.url : null;
     }
   } catch (e) { /* offline / rejected — caller keeps its data URL */ }
   return null;
@@ -320,9 +330,9 @@ function persistChange(listing) {
    otherwise (or on any error) use the _mock* body underneath.
    ============================================================ */
 
-function apiGetCities() {
+async function apiGetCities() {
   try {
-    const all = apiGetListings({ status: "all" });
+    const all = await apiGetListings({ status: "all" });
     const cities = Array.from(new Set(all.map(l => cityOf(l.location || "")).filter(Boolean))).sort();
     if (cities.length) return cities;
   } catch (e) { /* fall through to mock */ }
@@ -332,15 +342,15 @@ function _mockGetCities() {
   return Array.from(new Set(_listings.map(l => cityOf(l.location)))).sort();
 }
 
-function apiGetListings(filters = {}) {
-  if (backendUp()) {
+async function apiGetListings(filters = {}) {
+  if (await backendUp()) {
     try {
       const path = "/api/listings" + apiQuery({
         category: filters.category || "",
         status: (filters.status && filters.status !== "all") ? filters.status : "",
         search: filters.search || "",
       });
-      const rows = syncXHR("GET", path, null, false) || [];
+      const rows = await requestXHR("GET", path, null, false) || [];
       let out = rows.map(normalizeListing);
       // The backend has no city param, so proximity stays client-side.
       if (filters.city) out = out.filter(l => cityOf(l.location) === filters.city);
@@ -359,10 +369,10 @@ function _mockGetListings(filters = {}) {
   });
 }
 
-function apiGetListingById(id) {
-  if (backendUp()) {
+async function apiGetListingById(id) {
+  if (await backendUp()) {
     try {
-      const row = syncXHR("GET", "/api/listings/" + encodeURIComponent(id), null, false);
+      const row = await requestXHR("GET", "/api/listings/" + encodeURIComponent(id), null, false);
       if (row && row.id) return normalizeListing(row);
     } catch (e) {
       if (e && e.status === 404) return null; // genuinely gone
@@ -375,8 +385,8 @@ function _mockGetListingById(id) {
   return _listings.find(l => l.id === Number(id)) || null;
 }
 
-function apiAddListing(fields = {}) {
-  if (backendUp()) {
+async function apiAddListing(fields = {}) {
+  if (await backendUp()) {
     if (!apiHasAuth()) return null; // caller toasts / bails out
     try {
       const body = {
@@ -391,7 +401,7 @@ function apiAddListing(fields = {}) {
         needs_disposer: !!fields.needs_disposer,
         disposer_note: fields.disposer_note || "",
       };
-      const row = syncXHR("POST", "/api/listings", body, true);
+      const row = await requestXHR("POST", "/api/listings", body, true);
       if (row && row.id) return normalizeListing(row);
     } catch (e) {
       if (e && e.status === 401) { apiToast("Please log in first."); return null; }
@@ -418,13 +428,13 @@ function _mockAddListing(fields = {}) {
   return listing;
 }
 
-function apiClaimListing(id) {
-  if (backendUp()) {
+async function apiClaimListing(id) {
+  if (await backendUp()) {
     if (!apiToken()) return { ok: false, message: "Please log in first." };
     try {
-      syncXHR("POST", "/api/listings/" + encodeURIComponent(id) + "/claim", {}, true);
+      await requestXHR("POST", "/api/listings/" + encodeURIComponent(id) + "/claim", {}, true);
       let listing = null;
-      try { listing = apiGetListingById(id); } catch (e2) { /* cosmetic only */ }
+      try { listing = await apiGetListingById(id); } catch (e2) { /* cosmetic only */ }
       return { ok: true, message: "Claimed! Contact details would be shared here.", listing };
     } catch (e) {
       if (e && e.status && e.status < 500) {
@@ -444,13 +454,13 @@ function _mockClaimListing(id) {
   return { ok: true, message: "Claimed! Contact details would be shared here.", listing: l };
 }
 
-function apiCollectListing(id) {
-  if (backendUp()) {
+async function apiCollectListing(id) {
+  if (await backendUp()) {
     if (!apiToken()) return { ok: false, message: "Please log in first." };
     try {
-      syncXHR("POST", "/api/listings/" + encodeURIComponent(id) + "/collect", {}, true);
+      await requestXHR("POST", "/api/listings/" + encodeURIComponent(id) + "/collect", {}, true);
       let listing = null;
-      try { listing = apiGetListingById(id); } catch (e2) { /* cosmetic only */ }
+      try { listing = await apiGetListingById(id); } catch (e2) { /* cosmetic only */ }
       let message = "Marked collected — thank you.";
       if (listing) {
         const m = catMeta(listing.category);
@@ -511,11 +521,11 @@ function _findRequest(id) {
 }
 
 /* --- Disposers (backend first, mock fallback) --- */
-function apiGetDisposers(sortBy = 'kg') {
-  if (backendUp()) {
+async function apiGetDisposers(sortBy = 'kg') {
+  if (await backendUp()) {
     try {
       const sort = (sortBy === 'cleanups' || sortBy === 'vouches') ? sortBy : 'kg';
-      const rows = syncXHR('GET', '/api/disposers' + apiQuery({ sort }), null, false) || [];
+      const rows = await requestXHR('GET', '/api/disposers' + apiQuery({ sort }), null, false) || [];
       if (rows.length) return rows.map(normalizeDisposer);
       return [];
     } catch (e) { /* fall through to mock */ }
@@ -530,10 +540,10 @@ function _mockGetDisposers(sortBy = 'kg') {
   return arr;
 }
 
-function apiGetDisposerById(id) {
-  if (backendUp()) {
+async function apiGetDisposerById(id) {
+  if (await backendUp()) {
     try {
-      const row = syncXHR('GET', '/api/disposers/' + encodeURIComponent(id), null, false);
+      const row = await requestXHR('GET', '/api/disposers/' + encodeURIComponent(id), null, false);
       if (row && row.id) return normalizeDisposer(row);
     } catch (e) {
       if (e && e.status === 404) return null;
@@ -546,10 +556,10 @@ function _mockGetDisposerById(id) {
   return DISPOSERS.find(d => d.id === Number(id)) || null;
 }
 
-function apiCreateDisposer(fields = {}) {
-  if (backendUp() && apiToken()) {
+async function apiCreateDisposer(fields = {}) {
+  if ((await backendUp()) && apiToken()) {
     try {
-      const row = syncXHR('POST', '/api/disposers', {
+      const row = await requestXHR('POST', '/api/disposers', {
         service_area: fields.service_area || '',
         contact_method: fields.contact_method || 'call',
         contact_value: fields.contact_value || '',
@@ -558,7 +568,7 @@ function apiCreateDisposer(fields = {}) {
       }, true);
       if (row && row.id) return normalizeDisposer(row);
     } catch (e) { /* fall through to mock */ }
-  } else if (backendUp()) {
+  } else if (await backendUp()) {
     /* No token: prompt, then still hand back a local profile so
        become-disposer.js (which reads profile.id) cannot crash. */
     apiToast('Please log in first.');
@@ -585,11 +595,11 @@ function _mockCreateDisposer(fields = {}) {
   return profile;
 }
 
-function apiVouchDisposer(id) {
-  if (backendUp()) {
+async function apiVouchDisposer(id) {
+  if (await backendUp()) {
     if (!apiToken()) return { ok: false, message: 'Please log in first.' };
     try {
-      const res = syncXHR('POST', '/api/disposers/' + encodeURIComponent(id) + '/vouch', {}, true);
+      const res = await requestXHR('POST', '/api/disposers/' + encodeURIComponent(id) + '/vouch', {}, true);
       return { ok: true, vouch_count: (res && res.vouch_count !== undefined) ? res.vouch_count : undefined };
     } catch (e) {
       if (e && e.status && e.status < 500) {
@@ -608,11 +618,11 @@ function _mockVouchDisposer(id) {
 }
 
 /* --- Support: pledge / contact / verification --- */
-function apiPledgeSupport(id, qty) {
-  if (backendUp()) {
+async function apiPledgeSupport(id, qty) {
+  if (await backendUp()) {
     if (!apiToken()) return { ok: false, message: 'Please log in first.' };
     try {
-      syncXHR('POST', '/api/support-requests/' + encodeURIComponent(id) + '/pledge',
+      await requestXHR('POST', '/api/support-requests/' + encodeURIComponent(id) + '/pledge',
         { qty: Number(qty) || 1 }, true);
       return { ok: true, message: 'Pledge recorded.' };
     } catch (e) {
@@ -643,11 +653,11 @@ function _mockPledgeSupport(id, qty) {
   return { ok: true, qty_fulfilled: req.qty_fulfilled };
 }
 
-function apiConfirmSupportPledge(pledgeId) {
-  if (backendUp()) {
+async function apiConfirmSupportPledge(pledgeId) {
+  if (await backendUp()) {
     if (!apiToken()) return { ok: false, message: 'Please log in first.' };
     try {
-      syncXHR('POST', '/api/support-pledges/' + encodeURIComponent(pledgeId) + '/confirm',
+      await requestXHR('POST', '/api/support-pledges/' + encodeURIComponent(pledgeId) + '/confirm',
         { confirmed: true }, true);
       return { ok: true };
     } catch (e) {
@@ -665,11 +675,11 @@ function _mockConfirmSupportPledge(pledgeId) {
   return { ok: false, message: 'Pledge not found.' };
 }
 
-function apiGetSupportContact(id) {
-  if (backendUp()) {
+async function apiGetSupportContact(id) {
+  if (await backendUp()) {
     if (!apiHasAuth()) return null; // toasts, caller just bails out
     try {
-      const res = syncXHR('GET', '/api/support-requests/' + encodeURIComponent(id) + '/contact', null, true);
+      const res = await requestXHR('GET', '/api/support-requests/' + encodeURIComponent(id) + '/contact', null, true);
       if (res) return { contact_method: res.contact_method || 'dropoff', contact_value: res.contact_value || '' };
     } catch (e) { /* fall through to mock */ }
   }
@@ -682,8 +692,8 @@ function _mockGetSupportContact(id) {
 }
 
 /* --- Verification (cleared) --- */
-function apiCreateVerification(fields = {}) {
-  if (backendUp()) {
+async function apiCreateVerification(fields = {}) {
+  if (await backendUp()) {
     if (!apiHasAuth()) return null;
     try {
       const body = {
@@ -694,7 +704,7 @@ function apiCreateVerification(fields = {}) {
       /* backend wants exactly one parent */
       if (fields.activity_id) body.activity_id = Number(fields.activity_id);
       else if (fields.listing_id) body.listing_id = Number(fields.listing_id);
-      const res = syncXHR('POST', '/api/verifications', body, true);
+      const res = await requestXHR('POST', '/api/verifications', body, true);
       if (res) return { ok: true, verification: res };
     } catch (e) {
       if (e && e.status && e.status < 500) {
@@ -759,15 +769,15 @@ let _nextStoryId = Math.max(0, ...SEED_STORIES.map(s => s.id), ..._addedStories.
 let _nextSupportId = Math.max(0, ...SEED_SUPPORT_REQUESTS.map(s => s.id), ..._addedSupportRequests.map(s => s.id)) + 1;
 
 /* ---------- Activities ---------- */
-function apiGetActivities(filters = {}) {
-  if (backendUp()) {
+async function apiGetActivities(filters = {}) {
+  if (await backendUp()) {
     try {
       const path = "/api/activities" + apiQuery({
         location: filters.location || "",
         status: (filters.status && filters.status !== "all") ? filters.status : "",
         search: filters.search || "",
       });
-      const rows = syncXHR("GET", path, null, false) || [];
+      const rows = await requestXHR("GET", path, null, false) || [];
       return rows.map(normalizeActivity);
     } catch (e) { /* fall through to mock */ }
   }
@@ -781,10 +791,10 @@ function _mockGetActivities(filters = {}) {
   });
 }
 
-function apiGetActivityById(id) {
-  if (backendUp()) {
+async function apiGetActivityById(id) {
+  if (await backendUp()) {
     try {
-      const row = syncXHR("GET", "/api/activities/" + encodeURIComponent(id), null, false);
+      const row = await requestXHR("GET", "/api/activities/" + encodeURIComponent(id), null, false);
       if (row && row.id) return normalizeActivity(row);
     } catch (e) {
       if (e && e.status === 404) return null;
@@ -806,8 +816,8 @@ function _toRFC3339(value) {
   return isNaN(d.getTime()) ? null : d.toISOString();
 }
 
-function apiCreateActivity(fields = {}) {
-  if (backendUp()) {
+async function apiCreateActivity(fields = {}) {
+  if (await backendUp()) {
     if (!apiHasAuth()) return null;
     try {
       const body = {
@@ -822,7 +832,7 @@ function apiCreateActivity(fields = {}) {
       };
       const when = _toRFC3339(fields.event_date);
       if (when) body.event_date = when;
-      const row = syncXHR("POST", "/api/activities", body, true);
+      const row = await requestXHR("POST", "/api/activities", body, true);
       if (row && row.id) return normalizeActivity(row);
     } catch (e) {
       if (e && e.status === 401) { apiToast("Please log in first."); return null; }
@@ -854,11 +864,11 @@ function _mockCreateActivity(fields = {}) {
   return activity;
 }
 
-function apiPledgeActivity(id) {
-  if (backendUp()) {
+async function apiPledgeActivity(id) {
+  if (await backendUp()) {
     if (!apiToken()) return { ok: false, message: "Please log in first." };
     try {
-      syncXHR("POST", "/api/activities/" + encodeURIComponent(id) + "/pledge", {}, true);
+      await requestXHR("POST", "/api/activities/" + encodeURIComponent(id) + "/pledge", {}, true);
       return { ok: true, message: "Thanks for pledging — see you there!" };
     } catch (e) {
       if (e && e.status && e.status < 500) {
@@ -879,14 +889,14 @@ function _mockPledgeActivity(id) {
 }
 
 /* ---------- Impact stories ---------- */
-function apiGetStories(filters = {}) {
-  if (backendUp()) {
+async function apiGetStories(filters = {}) {
+  if (await backendUp()) {
     try {
       const path = "/api/stories" + apiQuery({
         location: filters.location || "",
         search: filters.search || "",
       });
-      const rows = syncXHR("GET", path, null, false) || [];
+      const rows = await requestXHR("GET", path, null, false) || [];
       return rows.map(normalizeStory);
     } catch (e) { /* fall through to mock */ }
   }
@@ -899,10 +909,10 @@ function _mockGetStories(filters = {}) {
   });
 }
 
-function apiGetStoryById(id) {
-  if (backendUp()) {
+async function apiGetStoryById(id) {
+  if (await backendUp()) {
     try {
-      const row = syncXHR("GET", "/api/stories/" + encodeURIComponent(id), null, false);
+      const row = await requestXHR("GET", "/api/stories/" + encodeURIComponent(id), null, false);
       if (row && row.id) return normalizeStory(row);
     } catch (e) {
       if (e && e.status === 404) return null;
@@ -915,8 +925,8 @@ function _mockGetStoryById(id) {
   return _stories.find(s => s.id === Number(id)) || null;
 }
 
-function apiCreateStory(fields = {}) {
-  if (backendUp()) {
+async function apiCreateStory(fields = {}) {
+  if (await backendUp()) {
     if (!apiHasAuth()) return null;
     try {
       const body = {
@@ -929,7 +939,7 @@ function apiCreateStory(fields = {}) {
       };
       if (fields.activity_id) body.activity_id = Number(fields.activity_id);
       if (fields.disposer_user_id) body.disposer_user_id = Number(fields.disposer_user_id);
-      const row = syncXHR("POST", "/api/stories", body, true);
+      const row = await requestXHR("POST", "/api/stories", body, true);
       if (row && row.id) return normalizeStory(row);
     } catch (e) {
       if (e && e.status === 401) { apiToast("Please log in first."); return null; }
@@ -961,8 +971,8 @@ function _mockCreateStory(fields = {}) {
 }
 
 /* ---------- Support requests ---------- */
-function apiGetSupportRequests(filters = {}) {
-  if (backendUp()) {
+async function apiGetSupportRequests(filters = {}) {
+  if (await backendUp()) {
     try {
       const path = "/api/support-requests" + apiQuery({
         activity_id: filters.activity_id || "",
@@ -970,7 +980,7 @@ function apiGetSupportRequests(filters = {}) {
         listing_id: filters.listing_id || "",
         kind: filters.kind || "",
       });
-      const rows = syncXHR("GET", path, null, false) || [];
+      const rows = await requestXHR("GET", path, null, false) || [];
       return rows.map(normalizeSupportRequest);
     } catch (e) { /* fall through to mock */ }
   }
@@ -985,8 +995,8 @@ function _mockGetSupportRequests(filters = {}) {
   });
 }
 
-function apiCreateSupportRequest(fields = {}) {
-  if (backendUp()) {
+async function apiCreateSupportRequest(fields = {}) {
+  if (await backendUp()) {
     if (!apiHasAuth()) return null;
     try {
       const body = {
@@ -1000,7 +1010,7 @@ function apiCreateSupportRequest(fields = {}) {
       if (fields.activity_id) body.activity_id = Number(fields.activity_id);
       else if (fields.disposer_id) body.disposer_id = Number(fields.disposer_id);
       else if (fields.listing_id) body.listing_id = Number(fields.listing_id);
-      const row = syncXHR("POST", "/api/support-requests", body, true);
+      const row = await requestXHR("POST", "/api/support-requests", body, true);
       if (row && row.id) return normalizeSupportRequest(row);
     } catch (e) {
       if (e && e.status === 401) { apiToast("Please log in first."); return null; }
@@ -1031,10 +1041,10 @@ function _mockCreateSupportRequest(fields = {}) {
 }
 
 /* ---------- Merged feed ---------- */
-function apiGetFeed(limit = 12) {
-  if (backendUp()) {
+async function apiGetFeed(limit = 12) {
+  if (await backendUp()) {
     try {
-      const rows = syncXHR("GET", "/api/feed" + apiQuery({ limit }), null, false) || [];
+      const rows = await requestXHR("GET", "/api/feed" + apiQuery({ limit }), null, false) || [];
       return rows.map(normalizeFeedItem);
     } catch (e) { /* fall through to mock */ }
   }

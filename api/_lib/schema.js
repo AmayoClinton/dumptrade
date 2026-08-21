@@ -156,38 +156,13 @@ const TABLES = [
    )`,
 ];
 
-// Additive columns: harmless on a fresh database, required when the database
-// was first created by the older Go backend.
-const COLUMNS = [
-  `ALTER TABLE listings ADD COLUMN IF NOT EXISTS needs_disposer BOOLEAN DEFAULT false`,
-  `ALTER TABLE listings ADD COLUMN IF NOT EXISTS disposer_note TEXT`,
-  `ALTER TABLE activities ADD COLUMN IF NOT EXISTS needs_disposer BOOLEAN DEFAULT false`,
-  `ALTER TABLE activities ADD COLUMN IF NOT EXISTS target_volume_label TEXT`,
-  `ALTER TABLE stories ADD COLUMN IF NOT EXISTS activity_id INTEGER`,
-  `ALTER TABLE stories ADD COLUMN IF NOT EXISTS disposer_user_id INTEGER`,
-  `ALTER TABLE support_pledges ADD COLUMN IF NOT EXISTS confirmed_at TIMESTAMPTZ`,
-];
+// Additive columns: the JS CREATE TABLE statements above already declare
+// these columns and the unique constraints, so the original Go-backend
+// ALTERs/extra unique indexes are no longer needed and were removed to
+// cut cold-start round-trips. (The Go backend was deleted.)
+const COLUMNS = [];
 
-const INDEXES = [
-  `CREATE INDEX IF NOT EXISTS idx_listings_status ON listings(status)`,
-  `CREATE INDEX IF NOT EXISTS idx_listings_category ON listings(category)`,
-  `CREATE INDEX IF NOT EXISTS idx_listings_created_at ON listings(created_at DESC)`,
-  `CREATE INDEX IF NOT EXISTS idx_claims_listing_id ON claims(listing_id)`,
-  `CREATE INDEX IF NOT EXISTS idx_activities_status ON activities(status)`,
-  `CREATE INDEX IF NOT EXISTS idx_activities_created_at ON activities(created_at DESC)`,
-  `CREATE INDEX IF NOT EXISTS idx_stories_created_at ON stories(created_at DESC)`,
-  `CREATE INDEX IF NOT EXISTS idx_support_requests_activity ON support_requests(activity_id)`,
-  `CREATE INDEX IF NOT EXISTS idx_support_requests_disposer ON support_requests(disposer_id)`,
-  `CREATE INDEX IF NOT EXISTS idx_support_requests_listing ON support_requests(listing_id)`,
-  `CREATE INDEX IF NOT EXISTS idx_support_pledges_request ON support_pledges(support_request_id)`,
-  `CREATE INDEX IF NOT EXISTS idx_verifications_disposer ON verifications(disposer_user_id)`,
-  `CREATE INDEX IF NOT EXISTS idx_vouches_disposer ON vouches(disposer_user_id)`,
-  // Safety nets for the ON CONFLICT targets used by the routes, in case the
-  // tables were created elsewhere without the inline UNIQUE constraints.
-  `CREATE UNIQUE INDEX IF NOT EXISTS ux_disposer_profiles_user_id ON disposer_profiles(user_id)`,
-  `CREATE UNIQUE INDEX IF NOT EXISTS ux_activity_pledges_activity_user ON activity_pledges(activity_id, user_id)`,
-  `CREATE UNIQUE INDEX IF NOT EXISTS ux_vouches_disposer_voucher ON vouches(disposer_user_id, voucher_user_id)`,
-];
+const INDEXES = [];
 
 const DEMO_PASSWORD = 'password123';
 

@@ -38,9 +38,10 @@
 <script src="js/claim.js"></script>
 <script src="js/verify.js"></script>
 <script>
+  (async () => {
   const params = new URLSearchParams(window.location.search);
   const id = Number(params.get("id"));
-  const listing = apiGetListingById(id);
+  const listing = await apiGetListingById(id);
   const container = document.getElementById("detail-container");
 
   if (listing) {
@@ -52,6 +53,7 @@
   } else {
     container.innerHTML = `<div class="empty-state">Listing not found. It may have been removed. <br><a class="btn btn-primary" style="margin-top:16px;" href="browse.html">Back to Browse</a></div>`;
   }
+  })().catch(err => console.error("[listing] load failed:", err));
 </script>
 </body>
 </html>

@@ -70,17 +70,17 @@ function storyCard(s) {
     </div>`;
 }
 
-function renderActivities() {
+async function renderActivities() {
   const el = document.getElementById("pane-activities");
-  const items = apiGetActivities({});
+  const items = await apiGetActivities({});
   el.innerHTML = items.length
     ? `<div class="ticket-grid">${items.map(activityCard).join("")}</div>`
     : `<div class="empty-state">No activities posted yet.</div>`;
 }
 
-function renderStories() {
+async function renderStories() {
   const el = document.getElementById("pane-stories");
-  const items = apiGetStories({});
+  const items = await apiGetStories({});
   el.innerHTML = items.length
     ? `<div class="ticket-grid">${items.map(storyCard).join("")}</div>`
     : `<div class="empty-state">No impact stories yet.</div>`;
@@ -105,18 +105,18 @@ function renderDisposersPane() {
 }
 
 /* ---------- Actions ---------- */
-function pledgeActivity(id) {
-  const res = apiPledgeActivity(id);
+async function pledgeActivity(id) {
+  const res = await apiPledgeActivity(id);
   showToast(res.message);
   if (res.ok) renderActivities();
 }
 
-function openSupportSheet(activityId, btn) {
+async function openSupportSheet(activityId, btn) {
   const sheet = document.querySelector(`.contact-sheet[data-support-for="${activityId}"]`);
   if (!sheet) return;
   if (sheet.classList.contains("open")) { sheet.classList.remove("open"); return; }
 
-  const reqs = apiGetSupportRequests({ activity_id: activityId });
+  const reqs = await apiGetSupportRequests({ activity_id: activityId });
   if (reqs.length === 0) {
     sheet.innerHTML = `<div class="contact-row"><span>No supplies requested yet — bring what you can.</span></div>`;
   } else {
@@ -129,8 +129,8 @@ function openSupportSheet(activityId, btn) {
 }
 
 /* ---------- Init ---------- */
-renderActivities();
-renderStories();
+renderActivities().catch(err => console.error("[browse] activities failed:", err));
+renderStories().catch(err => console.error("[browse] stories failed:", err));
 renderCatalogue(document.getElementById("pane-catalogue"));
 /* #pane-disposers is filled by renderDisposersPane() the first time the
    Disposers tab is opened (see the toggle handler above). */

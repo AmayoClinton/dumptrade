@@ -5,20 +5,20 @@
    the detail card in place so the status updates immediately.
 ============================================================ */
 
-function handleClaim(id) {
-  const result = apiClaimListing(id);
+async function handleClaim(id) {
+  const result = await apiClaimListing(id);
   showToast(result.message);
   if (result.ok) rerenderDetail(id);
 }
 
-function handleCollect(id) {
-  const result = apiCollectListing(id);
+async function handleCollect(id) {
+  const result = await apiCollectListing(id);
   showToast(result.message);
   if (result.ok) rerenderDetail(id);
 }
 
-function rerenderDetail(id) {
+async function rerenderDetail(id) {
   const container = document.getElementById("detail-container");
-  const listing = apiGetListingById(id);
+  const listing = await apiGetListingById(id);
   if (container && listing) container.innerHTML = detailHtml(listing);
 }

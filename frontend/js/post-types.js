@@ -111,27 +111,27 @@ wireStoryPhoto("story-after-input", "story-after-preview");
 /* Photos are hosted by POST /api/uploads (see uploadPhoto in api.js).
    If the upload fails (backend down) we keep the local data URL so the
    mock/offline path still shows a preview. */
-function resolvePhotoUrl(inputId, fallbackDataUrl) {
+async function resolvePhotoUrl(inputId, fallbackDataUrl) {
   const input = document.getElementById(inputId);
   const file = input && input.files && input.files[0];
   if (file && typeof uploadPhoto === "function") {
-    const url = uploadPhoto(file);
+    const url = await uploadPhoto(file);
     if (url) return url;
   }
   return fallbackDataUrl || "";
 }
 
-function submitActivity() {
+async function submitActivity() {
   const title = document.getElementById("activity-title").value.trim();
   const location = document.getElementById("activity-location").value.trim();
   if (!title || !location) {
     showToast("Please fill in title and location.");
     return;
   }
-  const activity = apiCreateActivity({
+  const activity = await apiCreateActivity({
     title,
     location,
-    photo_url: resolvePhotoUrl("activity-photo-input", activityPhotoDataUrl),
+    photo_url: await resolvePhotoUrl("activity-photo-input", activityPhotoDataUrl),
     description: document.getElementById("activity-description").value.trim() || "No extra details given.",
     event_date: document.getElementById("activity-date").value || "",
     target_volume_label: document.getElementById("activity-target-label").value.trim(),
@@ -145,7 +145,7 @@ function submitActivity() {
   window.location.href = "browse.html";
 }
 
-function submitStory() {
+async function submitStory() {
   const title = document.getElementById("story-title").value.trim();
   const location = document.getElementById("story-location").value.trim();
   if (!title || !location) {
@@ -154,14 +154,14 @@ function submitStory() {
   }
   const beforeImg = document.getElementById("story-before-preview").src;
   const afterImg = document.getElementById("story-after-preview").src;
-  const story = apiCreateStory({
+  const story = await apiCreateStory({
     title,
     location,
     caption: document.getElementById("story-caption").value.trim() || "",
     kg_removed: Number(document.getElementById("story-kg").value) || 0,
     disposer_name: document.getElementById("story-disposer").value.trim(),
-    before_photo_url: resolvePhotoUrl("story-before-input", beforeImg && beforeImg.startsWith("data:") ? beforeImg : ""),
-    after_photo_url: resolvePhotoUrl("story-after-input", afterImg && afterImg.startsWith("data:") ? afterImg : ""),
+    before_photo_url: await resolvePhotoUrl("story-before-input", beforeImg && beforeImg.startsWith("data:") ? beforeImg : ""),
+    after_photo_url: await resolvePhotoUrl("story-after-input", afterImg && afterImg.startsWith("data:") ? afterImg : ""),
   });
   if (!story) return; // api.js already toasted
   showToast("Story posted!");

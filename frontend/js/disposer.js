@@ -39,8 +39,8 @@ function renderDisposerProfile(d) {
     </div>`;
 }
 
-function vouchDisposer(id) {
-  const res = apiVouchDisposer(id);
+async function vouchDisposer(id) {
+  const res = await apiVouchDisposer(id);
   if (res.ok) {
     const el = document.getElementById('d-vouch');
     if (el) el.textContent = res.vouch_count;
@@ -53,15 +53,17 @@ function vouchDisposer(id) {
 window.addEventListener('DOMContentLoaded', () => {
   const params = new URLSearchParams(window.location.search);
   const id = Number(params.get('id'));
-  const d = apiGetDisposerById(id);
-  const container = document.getElementById('disposer-detail');
+  (async () => {
+    const d = await apiGetDisposerById(id);
+    const container = document.getElementById('disposer-detail');
 
-  if (d) {
-    container.innerHTML = renderDisposerProfile(d);
-    if (typeof renderSupportForParent === 'function') {
-      renderSupportForParent(document.getElementById('support-for-disposer'), 'disposer', id);
+    if (d) {
+      container.innerHTML = renderDisposerProfile(d);
+      if (typeof renderSupportForParent === 'function') {
+        renderSupportForParent(document.getElementById('support-for-disposer'), 'disposer', id);
+      }
+    } else {
+      container.innerHTML = `<div class="empty-state">Disposer not found. It may have been removed.</div>`;
     }
-  } else {
-    container.innerHTML = `<div class="empty-state">Disposer not found. It may have been removed.</div>`;
-  }
+  })().catch(err => console.error("[disposer] load failed:", err));
 });

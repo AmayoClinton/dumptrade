@@ -75,6 +75,7 @@
 <script src="js/disposer-directory.js"></script>
 <script src="js/browse-engagement.js"></script>
 <script>
+  (async () => {
   const params = new URLSearchParams(window.location.search);
   const filters = {
     category: params.get("category") || null,
@@ -85,7 +86,8 @@
 
   // Populate location dropdown from listings actually on the platform.
   const locationSelect = document.getElementById("location-select");
-  apiGetCities().forEach(city => {
+  const cities = await apiGetCities();
+  cities.forEach(city => {
     const opt = document.createElement("option");
     opt.value = city;
     opt.textContent = city;
@@ -106,8 +108,8 @@
     });
   }
 
-  function renderResults() {
-    document.getElementById("results").innerHTML = ticketGridHtml(apiGetListings(filters));
+  async function renderResults() {
+    document.getElementById("results").innerHTML = ticketGridHtml(await apiGetListings(filters));
   }
 
   document.getElementById("search-input").addEventListener("input", e => {
@@ -124,7 +126,8 @@
   });
 
   renderChips();
-  renderResults();
+  renderResults().catch(err => console.error("[browse] results failed:", err));
+  })().catch(err => console.error("[browse] load failed:", err));
 </script>
 </body>
 </html>

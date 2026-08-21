@@ -41,9 +41,9 @@ function renderBecomeDisposerCard(container) {
     </div>`;
 }
 
-function renderDisposerDirectory(container, sortBy = 'kg') {
+async function renderDisposerDirectory(container, sortBy = 'kg') {
   if (!container) return;
-  const disposers = apiGetDisposers(sortBy);
+  const disposers = await apiGetDisposers(sortBy);
   if (disposers.length === 0) {
     container.innerHTML = `<div class="empty-state">No disposers on the manifest yet.</div>`;
     return;
@@ -52,11 +52,11 @@ function renderDisposerDirectory(container, sortBy = 'kg') {
 }
 
 /* Shared hire / sponsor actions (mock toasts — no backend logic). */
-function hireDisposer(id) {
-  const d = apiGetDisposerById(id);
+async function hireDisposer(id) {
+  const d = await apiGetDisposerById(id);
   showToast(`Hire request sent to ${d ? d.user_name : 'disposer'}.`);
 }
-function sponsorMeal(id) {
-  const d = apiGetDisposerById(id);
+async function sponsorMeal(id) {
+  const d = await apiGetDisposerById(id);
   showToast(`Meal sponsorship offered to ${d ? d.user_name : 'disposer'}.`);
 }

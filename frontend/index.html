@@ -81,20 +81,22 @@
 <script src="js/api.js"></script>
 <script src="js/listings.js"></script>
 <script>
-  const available = apiGetListings({ status: "available" });
-  const collected = apiGetListings({ status: "all" }).filter(l => l.status === "collected");
-  const totalKg = collected.reduce((s, l) => s + catMeta(l.category).avgKg * l.qtyNum, 0);
+  (async () => {
+    const available = await apiGetListings({ status: "available" });
+    const collected = (await apiGetListings({ status: "all" })).filter(l => l.status === "collected");
+    const totalKg = collected.reduce((s, l) => s + catMeta(l.category).avgKg * l.qtyNum, 0);
 
-  document.getElementById("impact-strip").innerHTML = `
-    <div class="impact-card"><div class="impact-num">${collected.length}</div><div class="impact-label">items rescued</div></div>
-    <div class="impact-card"><div class="impact-num">~${totalKg}kg</div><div class="impact-label">est. diverted from landfill</div></div>
-    <div class="impact-card"><div class="impact-num">${available.length}</div><div class="impact-label">available right now</div></div>`;
+    document.getElementById("impact-strip").innerHTML = `
+      <div class="impact-card"><div class="impact-num">${collected.length}</div><div class="impact-label">items rescued</div></div>
+      <div class="impact-card"><div class="impact-num">~${totalKg}kg</div><div class="impact-label">est. diverted from landfill</div></div>
+      <div class="impact-card"><div class="impact-num">${available.length}</div><div class="impact-label">available right now</div></div>`;
 
-  document.getElementById("category-chips").innerHTML = CATEGORIES.map(c =>
-    `<a class="chip" href="browse.html?category=${c.key}"><span class="chip-swatch">${c.tag}</span>${c.label}</a>`
-  ).join("");
+    document.getElementById("category-chips").innerHTML = CATEGORIES.map(c =>
+      `<a class="chip" href="browse.html?category=${c.key}"><span class="chip-swatch">${c.tag}</span>${c.label}</a>`
+    ).join("");
 
-  document.getElementById("recent-listings").innerHTML = ticketGridHtml(available.slice(0, 6));
+    document.getElementById("recent-listings").innerHTML = ticketGridHtml(available.slice(0, 6));
+  })().catch(err => console.error("[index] load failed:", err));
 </script>
 <script src="js/feed.js"></script>
 </body>

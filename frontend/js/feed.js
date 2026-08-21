@@ -98,9 +98,9 @@ function feedCard(item) {
   }
 }
 
-function renderFeed(filter = "all") {
+async function renderFeed(filter = "all") {
   const stream = document.getElementById("feed-stream");
-  const all = apiGetFeed(9);
+  const all = await apiGetFeed(9);
   const items = filter === "all" ? all : all.filter(i => i.kind === filter);
 
   let html = items.length
@@ -117,7 +117,7 @@ document.getElementById("feed-tabs").addEventListener("click", e => {
   const btn = e.target.closest(".toggle-btn");
   if (!btn) return;
   document.querySelectorAll("#feed-tabs .toggle-btn").forEach(b => b.classList.toggle("toggle-active", b === btn));
-  renderFeed(btn.dataset.feed);
+  renderFeed(btn.dataset.feed).catch(err => console.error("[feed] render failed:", err));
 });
 
-renderFeed("all");
+renderFeed("all").catch(err => console.error("[feed] render failed:", err));

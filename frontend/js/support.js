@@ -48,8 +48,8 @@ function refreshSupportCard(req) {
   if (wrap) wrap.innerHTML = supportCardInner(req);
 }
 
-function showSupportContact(id, btn) {
-  const c = apiGetSupportContact(id);
+async function showSupportContact(id, btn) {
+  const c = await apiGetSupportContact(id);
   if (!c) return;
   const label = c.contact_method === 'call' ? 'Call'
     : c.contact_method === 'whatsapp' ? 'WhatsApp' : 'Drop-off pin';
@@ -64,10 +64,10 @@ function showSupportContact(id, btn) {
   sheet.innerHTML = `<strong>${label}</strong><span>${c.contact_value}</span>`;
 }
 
-function pledgeSupport(id) {
-  const req = apiGetSupportRequests().find(r => r.id === Number(id));
+async function pledgeSupport(id) {
+  const req = (await apiGetSupportRequests()).find(r => r.id === Number(id));
   if (!req) return;
-  const res = apiPledgeSupport(id, req.qty_needed);
+  const res = await apiPledgeSupport(id, req.qty_needed);
   if (res.ok) {
     refreshSupportCard(req);
     showToast('Thanks — you are bringing this.');
@@ -76,25 +76,25 @@ function pledgeSupport(id) {
   }
 }
 
-function confirmSupport(id) {
+async function confirmSupport(id) {
   const pledges = (typeof _pledges !== 'undefined' ? _pledges : [])
     .filter(p => p.support_request_id === Number(id));
-  if (pledges.length) apiConfirmSupportPledge(pledges[pledges.length - 1].id);
+  if (pledges.length) await apiConfirmSupportPledge(pledges[pledges.length - 1].id);
   showToast('Support confirmed — thank you.');
 }
 
-function renderSupportForParent(container, parentType, parentId) {
+async function renderSupportForParent(container, parentType, parentId) {
   if (!container) return;
   const numId = Number(parentId);
   let reqs;
   if (parentType === 'disposer') {
     /* The shared apiGetSupportRequests (parallel agent) has no disposer_id
        filter, so we post-filter here. */
-    reqs = apiGetSupportRequests().filter(r => r.disposer_id === numId);
+    reqs = (await apiGetSupportRequests()).filter(r => r.disposer_id === numId);
   } else if (parentType === 'activity') {
-    reqs = apiGetSupportRequests({ activity_id: numId });
+    reqs = await apiGetSupportRequests({ activity_id: numId });
   } else {
-    reqs = apiGetSupportRequests({ listing_id: numId });
+    reqs = await apiGetSupportRequests({ listing_id: numId });
   }
   if (reqs.length === 0) {
     container.innerHTML += `<div class="empty-state">No support requests for this ${parentType} yet.</div>`;

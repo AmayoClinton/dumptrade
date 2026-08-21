@@ -50,7 +50,7 @@ function removePhoto() {
   initDropzone();
 }
 
-function submitPost() {
+async function submitPost() {
   const title = document.getElementById("f-title").value.trim();
   const location = document.getElementById("f-location").value.trim();
   const qtyLabel = document.getElementById("f-qtylabel").value.trim();
@@ -65,11 +65,11 @@ function submitPost() {
   const fileInput = document.getElementById("photo-input");
   const file = fileInput && fileInput.files && fileInput.files[0];
   if (file && typeof uploadPhoto === "function") {
-    const hosted = uploadPhoto(file);
+    const hosted = await uploadPhoto(file);
     if (hosted) photoUrl = hosted;
   }
 
-  const listing = apiAddListing({
+  const listing = await apiAddListing({
     title,
     category: document.getElementById("f-category").value,
     qtyLabel,
