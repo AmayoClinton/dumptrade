@@ -28,7 +28,7 @@ func newMockListingStore() *mockListingStore {
 	}
 }
 
-func (m *mockListingStore) GetAll(category, status, search string) ([]models.Listing, error) {
+func (m *mockListingStore) GetAll(category, status, search, city string, limit, offset int) ([]models.Listing, error) {
 	result := make([]models.Listing, 0)
 	for _, l := range m.listings {
 		if category != "" && l.Category != category {
@@ -91,7 +91,7 @@ func (m *mockListingStore) Claim(listingID int, claimantID int) error {
 	return errors.New("listing not found")
 }
 
-func (m *mockListingStore) MarkCollected(listingID int) error {
+func (m *mockListingStore) MarkCollected(listingID int, actorID int) error {
 	for i, l := range m.listings {
 		if l.ID == listingID {
 			m.listings[i].Status = "collected"

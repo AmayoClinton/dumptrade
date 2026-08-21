@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"dumptrade/models"
@@ -11,12 +12,12 @@ import (
 )
 
 type ListingStore interface {
-	GetAll(category, status, search string) ([]models.Listing, error)
+	GetAll(category, status, search, city string, limit, offset int) ([]models.Listing, error)
 	GetByID(id int) (*models.Listing, error)
 	Create(listing *models.Listing) error
 	UpdateStatus(id int, status string) error
 	Claim(listingID int, claimantID int) error
-	MarkCollected(listingID int) error
+	MarkCollected(listingID int, actorID int) error
 }
 
 type ListingHandler struct {
@@ -27,17 +28,33 @@ func NewListingHandler(store ListingStore) *ListingHandler {
 	return &ListingHandler{Store: store}
 }
 
+func queryInt(c *gin.Context, key string, fallback, max int) int {
+	value, err := strconv.Atoi(c.DefaultQuery(key, strconv.Itoa(fallback)))
+	if err != nil || value < 0 {
+		return fallback
+	}
+	if max > 0 && value > max {
+		return max
+	}
+	return value
+}
+
 func (h *ListingHandler) GetListings(c *gin.Context) {
 	category := c.Query("category")
 	status := c.Query("status")
-	search := c.Query("search")
-
-	// If status is "all", don't filter by status
+	search := strings.TrimSpace(c.Query("search"))
+	city := strings.TrimSpace(c.Query("city"))
 	if status == "all" {
 		status = ""
 	}
 
-	listings, err := h.Store.GetAll(category, status, search)
+	limit := queryInt(c, "limit", 24, 100)
+	if limit == 0 {
+		limit = 24
+	}
+	offset := queryInt(c, "offset", 0, 0)
+
+	listings, err := h.Store.GetAll(category, status, search, city, limit, offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch listings: " + err.Error()})
 		return
@@ -46,9 +63,8 @@ func (h *ListingHandler) GetListings(c *gin.Context) {
 }
 
 func (h *ListingHandler) GetListing(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil || id <= 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid listing ID"})
 		return
 	}
@@ -70,7 +86,7 @@ type CreateListingInput struct {
 	Title       string `json:"title" binding:"required"`
 	Category    string `json:"category" binding:"required"`
 	Description string `json:"description"`
-	PhotoUrl    string `json:"photo_url"`
+	PhotoURL    string `json:"photo_url"`
 	QtyLabel    string `json:"qty_label" binding:"required"`
 	QtyNum      int    `json:"qty_num"`
 	Condition   string `json:"condition"`
@@ -84,22 +100,30 @@ func (h *ListingHandler) CreateListing(c *gin.Context) {
 		return
 	}
 
+	input.Title = strings.TrimSpace(input.Title)
+	input.QtyLabel = strings.TrimSpace(input.QtyLabel)
+	input.Location = strings.TrimSpace(input.Location)
+	if input.Title == "" || input.QtyLabel == "" || input.Location == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Title, quantity label, and location are required"})
+		return
+	}
+
 	validCategories := map[string]bool{
 		"furniture": true, "ewaste": true, "textiles": true, "construction": true,
 		"organic": true, "plastic": true, "industrial": true, "other": true,
 	}
 	if !validCategories[input.Category] {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid category. Must be one of: furniture, ewaste, textiles, construction, organic, plastic, industrial, other"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid category"})
 		return
 	}
 
-	userIDVal, exists := c.Get("userID")
-	if !exists {
+	userID, ok := c.Get("userID")
+	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User authentication required"})
 		return
 	}
-	userID, ok := userIDVal.(int)
-	if !ok || userID <= 0 {
+	userIDInt, ok := userID.(int)
+	if !ok || userIDInt <= 0 {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid authenticated user ID"})
 		return
 	}
@@ -110,19 +134,11 @@ func (h *ListingHandler) CreateListing(c *gin.Context) {
 	}
 
 	listing := models.Listing{
-		UserID:      userID,
-		Title:       input.Title,
-		Category:    input.Category,
-		Description: input.Description,
-		PhotoUrl:    input.PhotoUrl,
-		QtyLabel:    input.QtyLabel,
-		QtyNum:      qtyNum,
-		Condition:   input.Condition,
-		Location:    input.Location,
-		Status:      "available",
-		CreatedAt:   time.Now(),
+		UserID: userIDInt, Title: input.Title, Category: input.Category,
+		Description: strings.TrimSpace(input.Description), PhotoUrl: input.PhotoURL,
+		QtyLabel: input.QtyLabel, QtyNum: qtyNum, Condition: strings.TrimSpace(input.Condition),
+		Location: input.Location, Status: "available", CreatedAt: time.Now(),
 	}
-
 	if err := h.Store.Create(&listing); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create listing: " + err.Error()})
 		return
@@ -132,44 +148,39 @@ func (h *ListingHandler) CreateListing(c *gin.Context) {
 }
 
 func (h *ListingHandler) ClaimListing(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil || id <= 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid listing ID"})
 		return
 	}
-
-	userIDVal, exists := c.Get("userID")
-	if !exists {
+	userID, ok := c.Get("userID")
+	claimantID, validUser := userID.(int)
+	if !ok || !validUser || claimantID <= 0 {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User authentication required"})
 		return
 	}
-	claimantID, ok := userIDVal.(int)
-	if !ok || claimantID <= 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid authenticated user ID"})
-		return
-	}
-
 	if err := h.Store.Claim(id, claimantID); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-
 	c.JSON(http.StatusOK, gin.H{"message": "Listing claimed successfully"})
 }
 
 func (h *ListingHandler) MarkCollected(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil || id <= 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid listing ID"})
 		return
 	}
-
-	if err := h.Store.MarkCollected(id); err != nil {
+	userID, ok := c.Get("userID")
+	actorID, validUser := userID.(int)
+	if !ok || !validUser || actorID <= 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User authentication required"})
+		return
+	}
+	if err := h.Store.MarkCollected(id, actorID); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-
 	c.JSON(http.StatusOK, gin.H{"message": "Listing marked as collected successfully"})
 }

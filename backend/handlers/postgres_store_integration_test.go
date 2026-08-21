@@ -88,7 +88,7 @@ func TestPostgresStoresIntegration(t *testing.T) {
 	}
 
 	// 5. Query listings with filters
-	listings, err := listingStore.GetAll("construction", "available", "Scrap")
+	listings, err := listingStore.GetAll("construction", "available", "Scrap", "", 24, 0)
 	if err != nil {
 		t.Fatalf("listingStore.GetAll failed: %v", err)
 	}
@@ -127,7 +127,7 @@ func TestPostgresStoresIntegration(t *testing.T) {
 	}
 
 	// 7. Mark listing as collected
-	if err := listingStore.MarkCollected(listing.ID); err != nil {
+	if err := listingStore.MarkCollected(listing.ID, claimant.ID); err != nil {
 		t.Fatalf("listingStore.MarkCollected failed: %v", err)
 	}
 
