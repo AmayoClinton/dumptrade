@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Listing &mdash; DumpTrade</title>
+<title>Activity &mdash; DumpTrade</title>
 <link rel="stylesheet" href="css/styles.css">
 <link rel="stylesheet" href="css/engagement.css">
 </head>
@@ -35,22 +35,27 @@
 
 <script src="js/api.js"></script>
 <script src="js/listings.js"></script>
-<script src="js/claim.js"></script>
 <script src="js/verify.js"></script>
+<script src="js/support.js"></script>
 <script>
   const params = new URLSearchParams(window.location.search);
-  const id = Number(params.get("id"));
-  const listing = apiGetListingById(id);
-  const container = document.getElementById("detail-container");
+  const id = Number(params.get('id'));
+  const container = document.getElementById('detail-container');
+  const addons = document.getElementById('detail-addons');
+  let item = null;
 
-  if (listing) {
-    container.innerHTML = detailHtml(listing);
-    // Verification add-ons only make sense when a disposer was asked for.
-    if (listing.needs_disposer && typeof renderDetailAddons === "function") {
-      renderDetailAddons(document.getElementById("detail-addons"), listing);
+  if (typeof apiGetActivityById === 'function') {
+    item = apiGetActivityById(id);
+    if (item) {
+      if (typeof activityDetailHtml === 'function') container.innerHTML = activityDetailHtml(item);
+      else container.innerHTML = `<div class="detail-card"><div class="detail-body"><h1 class="detail-title">${item.title || 'Activity'}</h1><p class="detail-desc">${item.description || ''}</p></div></div>`;
     }
+  }
+  if (!item) {
+    container.innerHTML = `<div class="empty-state">Activity not found.</div>`;
   } else {
-    container.innerHTML = `<div class="empty-state">Listing not found. It may have been removed. <br><a class="btn btn-primary" style="margin-top:16px;" href="browse.html">Back to Browse</a></div>`;
+    if (typeof renderDetailAddons === 'function') renderDetailAddons(addons, item);
+    if (typeof renderSupportForParent === 'function') renderSupportForParent(addons, 'activity', id);
   }
 </script>
 </body>

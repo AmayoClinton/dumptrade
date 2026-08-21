@@ -1,0 +1,12 @@
+# Keep the deployment to just the Express API (api/) + the static site (frontend/).
+node_modules
+.git
+
+# The legacy Go backend is not deployed. Excluding it also keeps backend/.env
+# (which holds a real DATABASE_URL) out of the public static output.
+backend
+.go-cache
+
+# Local env files — set these as Vercel Environment Variables instead.
+.env
+.env.*

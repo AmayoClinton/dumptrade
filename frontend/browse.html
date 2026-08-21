@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Browse &mdash; DumpTrade</title>
 <link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/engagement.css">
 </head>
 <body>
 
@@ -28,33 +29,51 @@
   <div class="section">
     <div class="section-head"><span class="section-eyebrow">BROWSE</span><h2>Find something useful</h2></div>
 
-    <div class="search-row">
-      <input id="search-input" class="search-input" placeholder="Search by title...">
-      <div class="filter-group">
-        <label class="filter-label" for="location-select">Location</label>
-        <select id="location-select" class="select-input">
-          <option value="">All locations</option>
-        </select>
-      </div>
-      <div class="filter-group">
-        <label class="filter-label" for="status-select">Status</label>
-        <select id="status-select" class="select-input">
-          <option value="available">Available only</option>
-          <option value="all">All statuses</option>
-          <option value="claimed">Claimed</option>
-          <option value="collected">Collected</option>
-        </select>
-      </div>
+    <div class="toggle-row" id="browse-toggle">
+      <button class="toggle-btn toggle-active" data-pane="material">Dump material</button>
+      <button class="toggle-btn" data-pane="activities">Activities</button>
+      <button class="toggle-btn" data-pane="stories">Impact stories</button>
+      <button class="toggle-btn" data-pane="catalogue">Waste catalogue</button>
+      <button class="toggle-btn" data-pane="disposers">Disposers</button>
     </div>
 
-    <div class="chip-row" id="category-chip-row"></div>
+    <div id="pane-material">
+      <div class="search-row">
+        <input id="search-input" class="search-input" placeholder="Search by title...">
+        <div class="filter-group">
+          <label class="filter-label" for="location-select">Location</label>
+          <select id="location-select" class="select-input">
+            <option value="">All locations</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label class="filter-label" for="status-select">Status</label>
+          <select id="status-select" class="select-input">
+            <option value="available">Available only</option>
+            <option value="all">All statuses</option>
+            <option value="claimed">Claimed</option>
+            <option value="collected">Collected</option>
+          </select>
+        </div>
+      </div>
 
-    <div id="results"></div>
+      <div class="chip-row" id="category-chip-row"></div>
+
+      <div id="results"></div>
+    </div>
+
+    <div id="pane-activities" class="post-pane" hidden></div>
+    <div id="pane-stories" hidden></div>
+    <div id="pane-catalogue" hidden></div>
+    <div id="pane-disposers" class="post-pane" hidden></div>
   </div>
 </main>
 
 <script src="js/api.js"></script>
 <script src="js/listings.js"></script>
+<script src="js/catalogue.js"></script>
+<script src="js/disposer-directory.js"></script>
+<script src="js/browse-engagement.js"></script>
 <script>
   const params = new URLSearchParams(window.location.search);
   const filters = {

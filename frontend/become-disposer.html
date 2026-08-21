@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Become a disposer &mdash; DumpTrade</title>
+<link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/engagement.css">
+</head>
+<body>
+
+<div class="blob blob-1"></div>
+<div class="blob blob-2"></div>
+
+<nav class="topnav">
+  <a class="brand" href="index.html"><span class="brand-mark">DT</span><span class="brand-name">DumpTrade</span></a>
+  <div class="nav-links">
+    <a class="nav-btn" href="index.html">Home</a>
+    <a class="nav-btn" href="browse.html">Browse</a>
+    <a class="nav-btn" href="post.html">Post an item</a>
+  </div>
+  <div class="nav-auth">
+    <a class="btn btn-outline" href="login.html">Log in</a>
+    <a class="btn btn-primary" href="register.html">Register</a>
+  </div>
+</nav>
+
+<main>
+  <div class="section">
+    <div class="section-head"><span class="section-eyebrow">BECOME A DISPOSER</span><h2>Put your work on the manifest</h2></div>
+    <div class="form-card">
+      <label class="field"><span>Service area</span><input id="d-area" placeholder="e.g. Kisumu, Nyalenda"></label>
+      <label class="field"><span>Contact method</span>
+        <div class="toggle-row" id="d-method">
+          <button type="button" class="toggle-btn toggle-active" data-val="call">Call</button>
+          <button type="button" class="toggle-btn" data-val="whatsapp">WhatsApp</button>
+          <button type="button" class="toggle-btn" data-val="dropoff">Drop-off pin</button>
+        </div>
+      </label>
+      <label class="field"><span>Contact value</span><input id="d-contact" placeholder="phone number or drop-off pin"></label>
+      <label class="field"><span>Short bio</span><textarea id="d-bio" rows="3" placeholder="Tell the community about your route, crew or gear"></textarea></label>
+      <label class="field"><span>Available</span>
+        <div class="toggle-row" id="d-available">
+          <button type="button" class="toggle-btn toggle-active" data-val="on">On</button>
+          <button type="button" class="toggle-btn" data-val="off">Off</button>
+        </div>
+      </label>
+      <div class="detail-actions">
+        <button class="btn btn-primary" onclick="submitDisposer()">Create disposer profile</button>
+        <a class="btn btn-outline-dark" href="index.html">Cancel</a>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script src="js/api.js"></script>
+<script src="js/listings.js"></script>
+<script src="js/become-disposer.js"></script>
+</body>
+</html>

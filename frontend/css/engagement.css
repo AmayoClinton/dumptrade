@@ -1,0 +1,81 @@
+/* ============================================================
+   engagement.css
+   Disposer + support (contact-based donation) engine styles.
+   NEW classes only — design tokens reused from styles.css.
+   (Agent B — phases 6 & 7)
+   ============================================================ */
+
+/* --- Disposer directory cards --- */
+.disposer-card {
+  background: var(--card);
+  border: 1.5px solid var(--line);
+  border-radius: 18px;
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 12px 30px rgba(18, 32, 26, 0.06);
+}
+.disposer-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.disposer-name { font-size: 1.05rem; font-weight: 800; color: var(--ink); }
+.disposer-area { font-size: .85rem; color: var(--ink-soft); display: flex; align-items: center; gap: 6px; }
+.disposer-bio { font-size: .86rem; color: var(--ink-soft); line-height: 1.5; }
+
+.pill-disposer {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: .72rem; font-weight: 700; padding: 4px 10px; border-radius: 999px;
+  background: rgba(23, 164, 104, 0.12); color: var(--green-1);
+}
+.pill-disposer.off { background: rgba(120, 120, 120, 0.14); color: var(--ink-soft); }
+
+.disposer-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* --- Track record mini-stats --- */
+.track-record { display: flex; gap: 10px; flex-wrap: wrap; }
+.track-record .mini-stat {
+  flex: 1; min-width: 88px; background: #f5f8f6;
+  border-radius: 12px; padding: 10px 12px;
+}
+.track-record .mini-num { font-size: 1.15rem; font-weight: 800; color: var(--green-1); }
+.track-record .mini-label {
+  font-size: .68rem; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .04em;
+}
+
+/* --- Become-a-disposer prompt --- */
+.become-prompt {
+  background: linear-gradient(135deg, rgba(23, 164, 104, 0.10), rgba(11, 122, 76, 0.06));
+  border: 1.5px dashed var(--green-2);
+  border-radius: 18px;
+  padding: 20px 22px;
+  display: flex; flex-direction: column; gap: 10px;
+  max-width: 420px;
+}
+.become-prompt h3 { margin: 0; font-size: 1.05rem; color: var(--ink); }
+.become-prompt p { margin: 0; font-size: .88rem; color: var(--ink-soft); }
+
+/* --- Verify actions --- */
+.verify-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+
+/* --- Support cards (donation engine) --- */
+.support-card {
+  background: var(--card);
+  border: 1.5px solid var(--line);
+  border-radius: 16px;
+  padding: 16px 18px;
+  margin-top: 12px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.support-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.support-item-label { font-size: .9rem; font-weight: 600; color: var(--ink); }
+.support-progress { height: 8px; border-radius: 999px; background: var(--line); overflow: hidden; margin: 4px 0; }
+.support-progress > span { display: block; height: 100%; background: linear-gradient(135deg, var(--green-2), var(--green-1)); }
+.support-meta { font-size: .8rem; color: var(--ink-soft); }
+.support-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+
+.contact-sheet {
+  margin-top: 10px; padding: 12px 14px; border-radius: 12px;
+  background: rgba(23, 164, 104, 0.08); border: 1px dashed var(--green-2);
+  font-size: .88rem; display: flex; flex-direction: column; gap: 4px;
+}
+.contact-sheet strong { color: var(--green-1); text-transform: uppercase; font-size: .7rem; letter-spacing: .04em; }
+.contact-sheet span { color: var(--ink); font-weight: 600; }

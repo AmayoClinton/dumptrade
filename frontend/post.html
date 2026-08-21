@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Post an item &mdash; DumpTrade</title>
 <link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/engagement.css">
 </head>
 <body>
 
@@ -28,28 +29,88 @@
   <div class="section">
     <div class="section-head"><span class="section-eyebrow">POST AN ITEM</span><h2>What are you giving away?</h2></div>
     <div class="form-card">
-      <label class="field"><span>Photo</span>
-        <div id="dropzone" class="dropzone">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-          <div class="dropzone-text">Click to upload or drag & drop</div>
-          <div class="dropzone-sub">PNG or JPG, shown as a preview only in this mockup</div>
-        </div>
-        <input type="file" id="photo-input" accept="image/*" style="display:none">
-      </label>
-      <label class="field"><span>Title</span><input id="f-title" placeholder="e.g. 3 office chairs, minor wear"></label>
-      <label class="field"><span>Category</span>
-        <select id="f-category"></select>
-      </label>
-      <div class="field-row">
-        <label class="field"><span>Quantity label</span><input id="f-qtylabel" placeholder="e.g. 3 units, 40kg"></label>
-        <label class="field"><span>Quantity (numeric)</span><input id="f-qtynum" type="number" min="1" value="1"></label>
+      <div class="toggle-row" id="post-type-toggle">
+        <button class="toggle-btn toggle-active" data-type="material">Dump material</button>
+        <button class="toggle-btn" data-type="activity">Cleanup activity</button>
+        <button class="toggle-btn" data-type="story">Impact story</button>
       </div>
-      <label class="field"><span>Condition</span><input id="f-condition" placeholder="e.g. Used - good"></label>
-      <label class="field"><span>Location</span><input id="f-location" placeholder="e.g. Kisumu, Milimani"></label>
-      <label class="field"><span>Description</span><textarea id="f-description" rows="3" placeholder="Anything a claimant should know"></textarea></label>
-      <div class="detail-actions">
-        <button class="btn btn-primary" onclick="submitPost()">Post listing</button>
-        <a class="btn btn-outline-dark" href="index.html">Cancel</a>
+
+      <div id="pane-material" class="post-pane">
+        <label class="field"><span>Photo</span>
+          <div id="dropzone" class="dropzone">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+            <div class="dropzone-text">Click to upload or drag & drop</div>
+            <div class="dropzone-sub">PNG or JPG, shown as a preview only in this mockup</div>
+          </div>
+          <input type="file" id="photo-input" accept="image/*" style="display:none">
+        </label>
+        <label class="field"><span>Title</span><input id="f-title" placeholder="e.g. 3 office chairs, minor wear"></label>
+        <label class="field"><span>Category</span>
+          <select id="f-category"></select>
+        </label>
+        <div class="field-row">
+          <label class="field"><span>Quantity label</span><input id="f-qtylabel" placeholder="e.g. 3 units, 40kg"></label>
+          <label class="field"><span>Quantity (numeric)</span><input id="f-qtynum" type="number" min="1" value="1"></label>
+        </div>
+        <label class="field"><span>Condition</span><input id="f-condition" placeholder="e.g. Used - good"></label>
+        <label class="field"><span>Location</span><input id="f-location" placeholder="e.g. Kisumu, Milimani"></label>
+        <label class="field"><span>Description</span><textarea id="f-description" rows="3" placeholder="Anything a claimant should know"></textarea></label>
+
+        <label class="field"><span>Needs a disposer</span>
+          <div class="toggle-row"><button type="button" class="toggle-btn" id="needs-disposer-toggle">Off</button></div>
+        </label>
+        <label class="field"><span>Note for the disposer</span><input id="f-disposer-note" placeholder="e.g. needs a mkokoteni to haul from 2nd floor"></label>
+
+        <div class="detail-actions">
+          <button class="btn btn-primary" onclick="submitPost()">Post listing</button>
+          <a class="btn btn-outline-dark" href="index.html">Cancel</a>
+        </div>
+      </div>
+
+      <div id="pane-activity" class="post-pane" hidden>
+        <label class="field"><span>Photo</span>
+          <div id="activity-dropzone" class="dropzone">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+            <div class="dropzone-text">Click to upload or drag & drop</div>
+            <div class="dropzone-sub">PNG or JPG, shown as a preview only in this mockup</div>
+          </div>
+          <input type="file" id="activity-photo-input" accept="image/*" style="display:none">
+        </label>
+        <label class="field"><span>Title</span><input id="activity-title" placeholder="e.g. Nyalenda Drain Clearing"></label>
+        <label class="field"><span>Location</span><input id="activity-location" placeholder="e.g. Kisumu, Nyalenda"></label>
+        <label class="field"><span>Event date</span><input id="activity-date" type="date"></label>
+        <div class="field-row">
+          <label class="field"><span>Target volume label</span><input id="activity-target-label" placeholder="e.g. ~120kg"></label>
+          <label class="field"><span>Target kg</span><input id="activity-target-kg" type="number" min="0" value="0"></label>
+        </div>
+        <label class="field"><span>Volunteers needed</span><input id="activity-volunteers" type="number" min="0" value="0"></label>
+        <label class="field"><span>Needs a disposer</span>
+          <div class="toggle-row"><button type="button" class="toggle-btn" id="activity-needs-disposer-toggle">Off</button></div>
+        </label>
+        <label class="field"><span>Note for the disposer</span><input id="activity-disposer-note" placeholder="e.g. needs a mkokoteni to haul from 2nd floor"></label>
+        <label class="field"><span>Description</span><textarea id="activity-description" rows="3" placeholder="What are you organising and who can join"></textarea></label>
+        <div class="detail-actions">
+          <button class="btn btn-primary" type="button" onclick="submitActivity()">Post activity</button>
+          <a class="btn btn-outline-dark" href="index.html">Cancel</a>
+        </div>
+      </div>
+
+      <div id="pane-story" class="post-pane" hidden>
+        <label class="field"><span>Before photo</span><input type="file" id="story-before-input" accept="image/*"></label>
+        <label class="field"><span>After photo</span><input type="file" id="story-after-input" accept="image/*"></label>
+        <div class="story-split" id="story-split" style="display:none">
+          <div class="story-half"><img id="story-before-preview" alt="Before"><span class="story-tag">Before</span></div>
+          <div class="story-half"><img id="story-after-preview" alt="After"><span class="story-tag">After</span></div>
+        </div>
+        <label class="field"><span>Title</span><input id="story-title" placeholder="e.g. Before &amp; After: Milimani alley"></label>
+        <label class="field"><span>Location</span><input id="story-location" placeholder="e.g. Kisumu, Milimani"></label>
+        <label class="field"><span>Est. kg removed</span><input id="story-kg" type="number" min="0" value="0"></label>
+        <label class="field"><span>Tag a disposer</span><input id="story-disposer" placeholder="disposer name"></label>
+        <label class="field"><span>Caption</span><textarea id="story-caption" rows="3" placeholder="What did you clear?"></textarea></label>
+        <div class="detail-actions">
+          <button class="btn btn-primary" type="button" onclick="submitStory()">Post story</button>
+          <a class="btn btn-outline-dark" href="index.html">Cancel</a>
+        </div>
       </div>
     </div>
   </div>
@@ -58,5 +119,6 @@
 <script src="js/api.js"></script>
 <script src="js/listings.js"></script>
 <script src="js/post.js"></script>
+<script src="js/post-types.js"></script>
 </body>
 </html>

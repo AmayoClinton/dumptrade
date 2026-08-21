@@ -1,19 +1,244 @@
 /* ============================================================
    api.js
-   Stands in for real backend calls. Every function here mimics
-   what a fetch() to the backend will eventually do — same shapes,
-   same names minus the "api" prefix once wired to a real server.
-   Swap the bodies of these functions for fetch() calls when the
-   backend (see project Rmd) is ready; callers won't need to change.
+   REAL backend calls with a mock fallback.
 
-   NOTE ON PERSISTENCE: only session-created changes (new listings,
-   claim/collect status) are cached in sessionStorage — the seed
-   listings below always load fresh from this file. That means
-   editing anything here (like a photoUrl) shows up immediately on
-   reload instead of being masked by a stale cached copy. Remove
-   this whole persistence layer once the real backend + database
-   are wired up.
+   Every public api* function now talks to the Go/Gin backend at
+   /api/... and falls back to the in-memory mock (kept below, with
+   _mock* names) whenever the backend is unreachable or errors out.
+   That means the site still demos fine with the server switched off.
+
+   WHY SYNCHRONOUS XHR: several callers do
+       const x = apiGetListings(...)   // index.html, browse.html
+       const y = apiGetFeed(9)         // feed.js renderFeed
+   during page load and use the value immediately. Returning a
+   Promise would break all of them, so every call uses
+   XMLHttpRequest with open(method, url, false) — a deliberate
+   hackathon trade-off, not a pattern to keep in production.
+
+   NOTE ON PERSISTENCE (mock path only): session-created changes
+   (new listings, claim/collect status) are cached in sessionStorage;
+   the seed arrays below always load fresh from this file.
 ============================================================ */
+
+/* ============================================================
+   Backend transport helpers
+   ============================================================ */
+
+/* JWT saved by auth.js on login/register. Storage access can throw
+   (private mode / blocked cookies / file:// origins), so guard it. */
+function apiToken() {
+  try {
+    return localStorage.getItem('dumptrade_token') || '';
+  } catch (e) {
+    return '';
+  }
+}
+
+/* showToast() lives in listings.js; guard in case of load order. */
+function apiToast(msg) {
+  if (typeof showToast === 'function') showToast(msg);
+  else if (typeof console !== 'undefined') console.warn(msg);
+}
+
+/* Synchronous request. Returns parsed JSON on 2xx, throws otherwise.
+   Multipart uploads build their own XHR (see uploadPhoto). */
+function syncXHR(method, path, body, requireAuth) {
+  const xhr = new XMLHttpRequest();
+  xhr.open(method, path, false); // false === synchronous (see header note)
+  const hasBody = body !== null && body !== undefined;
+  if (hasBody) xhr.setRequestHeader('Content-Type', 'application/json');
+  if (requireAuth) {
+    const tok = apiToken();
+    if (tok) xhr.setRequestHeader('Authorization', 'Bearer ' + tok);
+  }
+  xhr.send(hasBody ? JSON.stringify(body) : null);
+
+  if (xhr.status >= 200 && xhr.status < 300) {
+    if (!xhr.responseText) return null;
+    try { return JSON.parse(xhr.responseText); } catch (e) { return null; }
+  }
+
+  const err = new Error('HTTP ' + xhr.status + ' ' + method + ' ' + path);
+  err.status = xhr.status;
+  try { err.body = JSON.parse(xhr.responseText); } catch (e) { err.body = null; }
+  throw err;
+}
+
+/* Ping /api/health once per page load and cache the answer, so a
+   dead backend costs one failed request instead of one per call. */
+let _backendUpCache = null;
+function backendUp() {
+  if (_backendUpCache !== null) return _backendUpCache;
+  try {
+    const r = syncXHR('GET', '/api/health', null, false);
+    _backendUpCache = !!(r && r.status === 'ok');
+  } catch (e) {
+    _backendUpCache = false;
+  }
+  return _backendUpCache;
+}
+
+/* True when we can make an authenticated call. Never throws: it
+   toasts and lets the caller decide what harmless value to return. */
+function apiHasAuth() {
+  if (apiToken()) return true;
+  apiToast('Please log in first.');
+  return false;
+}
+
+function apiQuery(params) {
+  const parts = [];
+  Object.keys(params || {}).forEach(k => {
+    const v = params[k];
+    if (v === undefined || v === null || v === '') return;
+    parts.push(encodeURIComponent(k) + '=' + encodeURIComponent(v));
+  });
+  return parts.length ? '?' + parts.join('&') : '';
+}
+
+/* ---------- snake_case (backend) -> camelCase (listings.js) ---------- */
+function normalizeListing(b) {
+  return {
+    id: b.id,
+    userID: b.user_id,
+    title: b.title,
+    category: b.category,
+    description: b.description || '',
+    photoUrl: b.photo_url || null,
+    qtyLabel: b.qty_label,
+    qtyNum: Number(b.qty_num) || 1,
+    condition: b.condition || '',
+    location: b.location || '',
+    status: b.status,
+    createdAt: b.created_at,
+    /* postedAt is an alias of createdAt: ticketCard() / detailHtml()
+       in listings.js render timeAgo(l.postedAt). Additive only. */
+    postedAt: b.created_at,
+    posterName: b.poster_name || '',
+    accountType: b.account_type || '',
+    /* listing.html decides whether to show the verify add-ons. */
+    needs_disposer: !!b.needs_disposer,
+    disposerNote: b.disposer_note || '',
+  };
+}
+
+/* Activities / stories / disposers / support requests already come
+   back snake_case and match the renderers — these just fill in
+   defaults so nothing prints "undefined". */
+function normalizeActivity(b) {
+  return Object.assign({}, b, {
+    description: b.description || '',
+    photo_url: b.photo_url || '',
+    location: b.location || '',
+    target_volume_label: b.target_volume_label || '',
+    target_kg: Number(b.target_kg) || 0,
+    volunteers_needed: Number(b.volunteers_needed) || 0,
+    volunteers_pledged: Number(b.volunteers_pledged) || 0,
+    status: b.status || 'upcoming',
+    needs_disposer: !!b.needs_disposer,
+    poster_name: b.poster_name || '',
+    account_type: b.account_type || '',
+  });
+}
+
+function normalizeStory(b) {
+  return Object.assign({}, b, {
+    caption: b.caption || '',
+    before_photo_url: b.before_photo_url || '',
+    after_photo_url: b.after_photo_url || '',
+    location: b.location || '',
+    kg_removed: Number(b.kg_removed) || 0,
+    disposer_name: b.disposer_name || '',
+    poster_name: b.poster_name || '',
+    account_type: b.account_type || '',
+  });
+}
+
+function normalizeDisposer(b) {
+  return {
+    id: b.id,
+    user_id: b.user_id,
+    user_name: b.user_name || 'Disposer',
+    service_area: b.service_area || '',
+    contact_method: b.contact_method || 'call',
+    contact_value: b.contact_value || '',
+    bio: b.bio || '',
+    available: !!b.available,
+    cleanups_completed: Number(b.cleanups_completed) || 0,
+    kg_diverted: Number(b.kg_diverted) || 0,
+    vouch_count: Number(b.vouch_count) || 0,
+    created_at: b.created_at,
+  };
+}
+
+function normalizeSupportRequest(b) {
+  return Object.assign({}, b, {
+    activity_id: b.activity_id === undefined ? null : b.activity_id,
+    disposer_id: b.disposer_id === undefined ? null : b.disposer_id,
+    listing_id: b.listing_id === undefined ? null : b.listing_id,
+    kind: b.kind || 'other',
+    item_label: b.item_label || '',
+    qty_needed: Number(b.qty_needed) || 0,
+    qty_fulfilled: Number(b.qty_fulfilled) || 0,
+    contact_method: b.contact_method || 'dropoff',
+    contact_value: b.contact_value || '',
+  });
+}
+
+/* /api/feed is already merged; this only backfills the per-kind
+   fields feed.js reads so no card renders NaN / undefined. */
+function normalizeFeedItem(b) {
+  const it = Object.assign({}, b);
+  it.kind = b.kind || 'listing';
+  it.title = b.title || '';
+  it.location = b.location || '';
+  it.photo_url = b.photo_url || '';
+  it.created_at = b.created_at || new Date().toISOString();
+  it.poster_name = b.poster_name || b.poster || '';
+  it.needs_disposer = !!b.needs_disposer;
+
+  if (it.kind === 'activity') {
+    it.volunteers_needed = Number(b.volunteers_needed) || 0;
+    it.volunteers_pledged = Number(b.volunteers_pledged) || 0;
+    it.status = b.status || 'upcoming';
+  } else if (it.kind === 'story') {
+    it.before_photo_url = b.before_photo_url || '';
+    it.after_photo_url = b.after_photo_url || b.photo_url || '';
+    it.kg_removed = Number(b.kg_removed) || 0;
+  } else if (it.kind === 'support') {
+    /* the merged row carries the support kind in support_kind or status */
+    it.support_kind = b.support_kind || b.status || 'other';
+    it.item_label = b.item_label || b.title || 'Support ask';
+    it.qty_needed = Number(b.qty_needed) || 0;
+    it.qty_fulfilled = Number(b.qty_fulfilled) || 0;
+    it.contact_method = b.contact_method || 'dropoff';
+    it.contact_value = b.contact_value || '';
+    it.status = '';
+  } else {
+    it.status = b.status || 'available';
+  }
+  return it;
+}
+
+/* ---------- Photo upload (multipart, public endpoint) ----------
+   Returns the hosted URL ("/assets/uploads/<file>") or null. */
+function uploadPhoto(file) {
+  if (!file) return null;
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/uploads', false);
+    const tok = apiToken();
+    if (tok) xhr.setRequestHeader('Authorization', 'Bearer ' + tok);
+    xhr.send(fd);
+    if (xhr.status >= 200 && xhr.status < 300) {
+      const res = JSON.parse(xhr.responseText);
+      return res && res.url ? res.url : null;
+    }
+  } catch (e) { /* offline / rejected — caller keeps its data URL */ }
+  return null;
+}
 
 const CATEGORIES = [
   { key: "furniture", label: "Furniture", avgKg: 15, tag: "FN" },
@@ -89,11 +314,42 @@ function persistChange(listing) {
   }
 }
 
+/* ============================================================
+   PUBLIC API — listings
+   Pattern for every function below: try the backend when it is up,
+   otherwise (or on any error) use the _mock* body underneath.
+   ============================================================ */
+
 function apiGetCities() {
+  try {
+    const all = apiGetListings({ status: "all" });
+    const cities = Array.from(new Set(all.map(l => cityOf(l.location || "")).filter(Boolean))).sort();
+    if (cities.length) return cities;
+  } catch (e) { /* fall through to mock */ }
+  return _mockGetCities();
+}
+function _mockGetCities() {
   return Array.from(new Set(_listings.map(l => cityOf(l.location)))).sort();
 }
 
 function apiGetListings(filters = {}) {
+  if (backendUp()) {
+    try {
+      const path = "/api/listings" + apiQuery({
+        category: filters.category || "",
+        status: (filters.status && filters.status !== "all") ? filters.status : "",
+        search: filters.search || "",
+      });
+      const rows = syncXHR("GET", path, null, false) || [];
+      let out = rows.map(normalizeListing);
+      // The backend has no city param, so proximity stays client-side.
+      if (filters.city) out = out.filter(l => cityOf(l.location) === filters.city);
+      return out;
+    } catch (e) { /* fall through to mock */ }
+  }
+  return _mockGetListings(filters);
+}
+function _mockGetListings(filters = {}) {
   return _listings.filter(l => {
     if (filters.category && l.category !== filters.category) return false;
     if (filters.status && filters.status !== "all" && l.status !== filters.status) return false;
@@ -104,10 +360,47 @@ function apiGetListings(filters = {}) {
 }
 
 function apiGetListingById(id) {
+  if (backendUp()) {
+    try {
+      const row = syncXHR("GET", "/api/listings/" + encodeURIComponent(id), null, false);
+      if (row && row.id) return normalizeListing(row);
+    } catch (e) {
+      if (e && e.status === 404) return null; // genuinely gone
+      /* else fall through to mock */
+    }
+  }
+  return _mockGetListingById(id);
+}
+function _mockGetListingById(id) {
   return _listings.find(l => l.id === Number(id)) || null;
 }
 
-function apiAddListing(fields) {
+function apiAddListing(fields = {}) {
+  if (backendUp()) {
+    if (!apiHasAuth()) return null; // caller toasts / bails out
+    try {
+      const body = {
+        title: fields.title || "",
+        category: fields.category || "other",
+        description: fields.description || "",
+        photo_url: fields.photoUrl || fields.photo_url || "",
+        qty_label: fields.qtyLabel || fields.qty_label || "",
+        qty_num: Number(fields.qtyNum || fields.qty_num) || 1,
+        condition: fields.condition || "",
+        location: fields.location || "",
+        needs_disposer: !!fields.needs_disposer,
+        disposer_note: fields.disposer_note || "",
+      };
+      const row = syncXHR("POST", "/api/listings", body, true);
+      if (row && row.id) return normalizeListing(row);
+    } catch (e) {
+      if (e && e.status === 401) { apiToast("Please log in first."); return null; }
+      /* else fall through to mock */
+    }
+  }
+  return _mockAddListing(fields);
+}
+function _mockAddListing(fields = {}) {
   const listing = {
     id: _nextId++,
     status: "available",
@@ -115,6 +408,8 @@ function apiAddListing(fields) {
     accountType: "individual",
     postedAt: new Date().toISOString(),
     photoUrl: null,
+    needs_disposer: !!fields.needs_disposer,
+    disposerNote: fields.disposer_note || "",
     ...fields,
   };
   _addedListings.unshift(listing);
@@ -124,7 +419,24 @@ function apiAddListing(fields) {
 }
 
 function apiClaimListing(id) {
-  const l = apiGetListingById(id);
+  if (backendUp()) {
+    if (!apiToken()) return { ok: false, message: "Please log in first." };
+    try {
+      syncXHR("POST", "/api/listings/" + encodeURIComponent(id) + "/claim", {}, true);
+      let listing = null;
+      try { listing = apiGetListingById(id); } catch (e2) { /* cosmetic only */ }
+      return { ok: true, message: "Claimed! Contact details would be shared here.", listing };
+    } catch (e) {
+      if (e && e.status && e.status < 500) {
+        return { ok: false, message: (e.body && e.body.error) || "Sorry — this was just claimed by someone else." };
+      }
+      /* 5xx / network — fall through to mock */
+    }
+  }
+  return _mockClaimListing(id);
+}
+function _mockClaimListing(id) {
+  const l = _mockGetListingById(id);
   if (!l) return { ok: false, message: "Listing not found." };
   if (l.status !== "available") return { ok: false, message: "Sorry — this was just claimed by someone else." };
   l.status = "claimed";
@@ -133,10 +445,631 @@ function apiClaimListing(id) {
 }
 
 function apiCollectListing(id) {
-  const l = apiGetListingById(id);
+  if (backendUp()) {
+    if (!apiToken()) return { ok: false, message: "Please log in first." };
+    try {
+      syncXHR("POST", "/api/listings/" + encodeURIComponent(id) + "/collect", {}, true);
+      let listing = null;
+      try { listing = apiGetListingById(id); } catch (e2) { /* cosmetic only */ }
+      let message = "Marked collected — thank you.";
+      if (listing) {
+        const m = catMeta(listing.category);
+        message = `Marked collected — ~${m.avgKg * (Number(listing.qtyNum) || 1)}kg diverted.`;
+      }
+      return { ok: true, message, listing };
+    } catch (e) {
+      if (e && e.status && e.status < 500) {
+        return { ok: false, message: (e.body && e.body.error) || "This item isn't awaiting collection." };
+      }
+      /* 5xx / network — fall through to mock */
+    }
+  }
+  return _mockCollectListing(id);
+}
+function _mockCollectListing(id) {
+  const l = _mockGetListingById(id);
   if (!l || l.status !== "claimed") return { ok: false, message: "This item isn't awaiting collection." };
   l.status = "collected";
   persistChange(l);
   const m = catMeta(l.category);
   return { ok: true, message: `Marked collected — ~${m.avgKg * l.qtyNum}kg diverted.`, listing: l };
+}
+
+/* === Engagement mock state: disposers + support ===
+   Fallback data for the disposer / support / verification endpoints.
+   Only used when the backend is unreachable or errors out. */
+
+/* --- Disposer profiles (mock seed) --- */
+/* Guard with typeof so a second declaration elsewhere can't clash. */
+if (typeof DISPOSERS === 'undefined') {
+  var DISPOSERS = [
+    { id: 1, user_id: 11, user_name: 'Otieno M.', service_area: 'Kisumu, Nyalenda', contact_method: 'whatsapp', contact_value: '254712345678', bio: 'Mkokoteni collector — daily route through Nyalenda and Kibos Road.', available: true, cleanups_completed: 14, kg_diverted: 1820, vouch_count: 6, created_at: hoursAgo(200) },
+    { id: 2, user_id: 12, user_name: 'Achieng B.', service_area: 'Kisumu, CBD', contact_method: 'call', contact_value: '254798765432', bio: 'Event cleanup crews and bulk hauling.', available: true, cleanups_completed: 9, kg_diverted: 1240, vouch_count: 4, created_at: hoursAgo(120) },
+  ];
+}
+
+/* Mock-only state (persisted across reload in sessionStorage). */
+let _supportAdded = loadJSON('dt_support_added', []);
+let _pledges = loadJSON('dt_pledges', []);
+let _verifications = loadJSON('dt_verifications', []);
+
+/* Combined support-request array (SEED_SUPPORT_REQUESTS + session
+   additions) lives further down as _supportReqs; referenced lazily
+   here so this block does not redeclare it. */
+function _activeSupportRequests() {
+  // Single source of truth is the Phase 3-5 block's _supportReqs array
+  // (declared later in this file with `let`). Reference it directly.
+  try { return _supportReqs || []; } catch (e) { return []; }
+}
+function _findRequest(id) {
+  const numId = Number(id);
+  let r = _supportAdded.find(x => x.id === numId);
+  if (r) return { req: r, owner: 'added' };
+  r = _activeSupportRequests().find(x => x.id === numId);
+  if (r) return { req: r, owner: 'seed' };
+  return { req: null, owner: null };
+}
+
+/* --- Disposers (backend first, mock fallback) --- */
+function apiGetDisposers(sortBy = 'kg') {
+  if (backendUp()) {
+    try {
+      const sort = (sortBy === 'cleanups' || sortBy === 'vouches') ? sortBy : 'kg';
+      const rows = syncXHR('GET', '/api/disposers' + apiQuery({ sort }), null, false) || [];
+      if (rows.length) return rows.map(normalizeDisposer);
+      return [];
+    } catch (e) { /* fall through to mock */ }
+  }
+  return _mockGetDisposers(sortBy);
+}
+function _mockGetDisposers(sortBy = 'kg') {
+  const arr = [...DISPOSERS];
+  if (sortBy === 'cleanups') arr.sort((a, b) => b.cleanups_completed - a.cleanups_completed);
+  else if (sortBy === 'vouches') arr.sort((a, b) => b.vouch_count - a.vouch_count);
+  else arr.sort((a, b) => b.kg_diverted - a.kg_diverted); // 'kg' default
+  return arr;
+}
+
+function apiGetDisposerById(id) {
+  if (backendUp()) {
+    try {
+      const row = syncXHR('GET', '/api/disposers/' + encodeURIComponent(id), null, false);
+      if (row && row.id) return normalizeDisposer(row);
+    } catch (e) {
+      if (e && e.status === 404) return null;
+      /* else fall through to mock */
+    }
+  }
+  return _mockGetDisposerById(id);
+}
+function _mockGetDisposerById(id) {
+  return DISPOSERS.find(d => d.id === Number(id)) || null;
+}
+
+function apiCreateDisposer(fields = {}) {
+  if (backendUp() && apiToken()) {
+    try {
+      const row = syncXHR('POST', '/api/disposers', {
+        service_area: fields.service_area || '',
+        contact_method: fields.contact_method || 'call',
+        contact_value: fields.contact_value || '',
+        bio: fields.bio || '',
+        available: fields.available !== undefined ? !!fields.available : true,
+      }, true);
+      if (row && row.id) return normalizeDisposer(row);
+    } catch (e) { /* fall through to mock */ }
+  } else if (backendUp()) {
+    /* No token: prompt, then still hand back a local profile so
+       become-disposer.js (which reads profile.id) cannot crash. */
+    apiToast('Please log in first.');
+  }
+  return _mockCreateDisposer(fields);
+}
+function _mockCreateDisposer(fields = {}) {
+  const id = DISPOSERS.reduce((m, d) => Math.max(m, d.id), 0) + 1;
+  const profile = {
+    id,
+    user_id: 1,
+    user_name: 'You',
+    service_area: fields.service_area || '',
+    contact_method: fields.contact_method || 'call',
+    contact_value: fields.contact_value || '',
+    bio: fields.bio || '',
+    available: fields.available !== undefined ? fields.available : true,
+    cleanups_completed: 0,
+    kg_diverted: 0,
+    vouch_count: 0,
+    created_at: new Date().toISOString(),
+  };
+  DISPOSERS.push(profile);
+  return profile;
+}
+
+function apiVouchDisposer(id) {
+  if (backendUp()) {
+    if (!apiToken()) return { ok: false, message: 'Please log in first.' };
+    try {
+      const res = syncXHR('POST', '/api/disposers/' + encodeURIComponent(id) + '/vouch', {}, true);
+      return { ok: true, vouch_count: (res && res.vouch_count !== undefined) ? res.vouch_count : undefined };
+    } catch (e) {
+      if (e && e.status && e.status < 500) {
+        return { ok: false, message: (e.body && e.body.error) || 'Could not vouch.' };
+      }
+      /* 5xx / network — fall through to mock */
+    }
+  }
+  return _mockVouchDisposer(id);
+}
+function _mockVouchDisposer(id) {
+  const d = _mockGetDisposerById(id);
+  if (!d) return { ok: false, message: 'Disposer not found.' };
+  d.vouch_count += 1;
+  return { ok: true, vouch_count: d.vouch_count };
+}
+
+/* --- Support: pledge / contact / verification --- */
+function apiPledgeSupport(id, qty) {
+  if (backendUp()) {
+    if (!apiToken()) return { ok: false, message: 'Please log in first.' };
+    try {
+      syncXHR('POST', '/api/support-requests/' + encodeURIComponent(id) + '/pledge',
+        { qty: Number(qty) || 1 }, true);
+      return { ok: true, message: 'Pledge recorded.' };
+    } catch (e) {
+      if (e && e.status && e.status < 500) {
+        return { ok: false, message: (e.body && e.body.error) || 'Could not pledge.' };
+      }
+      /* 5xx / network — fall through to mock */
+    }
+  }
+  return _mockPledgeSupport(id, qty);
+}
+function _mockPledgeSupport(id, qty) {
+  const { req } = _findRequest(id);
+  if (!req) return { ok: false, message: 'Request not found.' };
+  qty = Number(qty) || 1;
+  const pledge = {
+    id: _pledges.reduce((m, p) => Math.max(m, p.id || 0), 0) + 1,
+    support_request_id: req.id,
+    supporter_id: 1,
+    qty,
+    confirmed: false,
+    note: '',
+  };
+  _pledges.push(pledge);
+  saveJSON('dt_pledges', _pledges);
+  req.qty_fulfilled = (Number(req.qty_fulfilled) || 0) + qty;
+  if (_supportAdded.find(r => r.id === req.id)) saveJSON('dt_support_added', _supportAdded);
+  return { ok: true, qty_fulfilled: req.qty_fulfilled };
+}
+
+function apiConfirmSupportPledge(pledgeId) {
+  if (backendUp()) {
+    if (!apiToken()) return { ok: false, message: 'Please log in first.' };
+    try {
+      syncXHR('POST', '/api/support-pledges/' + encodeURIComponent(pledgeId) + '/confirm',
+        { confirmed: true }, true);
+      return { ok: true };
+    } catch (e) {
+      if (e && e.status && e.status < 500) {
+        return { ok: false, message: (e.body && e.body.error) || 'Could not confirm.' };
+      }
+      /* 5xx / network — fall through to mock */
+    }
+  }
+  return _mockConfirmSupportPledge(pledgeId);
+}
+function _mockConfirmSupportPledge(pledgeId) {
+  const p = _pledges.find(x => x.id === Number(pledgeId));
+  if (p) { p.confirmed = true; saveJSON('dt_pledges', _pledges); return { ok: true }; }
+  return { ok: false, message: 'Pledge not found.' };
+}
+
+function apiGetSupportContact(id) {
+  if (backendUp()) {
+    if (!apiHasAuth()) return null; // toasts, caller just bails out
+    try {
+      const res = syncXHR('GET', '/api/support-requests/' + encodeURIComponent(id) + '/contact', null, true);
+      if (res) return { contact_method: res.contact_method || 'dropoff', contact_value: res.contact_value || '' };
+    } catch (e) { /* fall through to mock */ }
+  }
+  return _mockGetSupportContact(id);
+}
+function _mockGetSupportContact(id) {
+  const { req } = _findRequest(id);
+  if (!req) return null;
+  return { contact_method: req.contact_method, contact_value: req.contact_value };
+}
+
+/* --- Verification (cleared) --- */
+function apiCreateVerification(fields = {}) {
+  if (backendUp()) {
+    if (!apiHasAuth()) return null;
+    try {
+      const body = {
+        disposer_user_id: Number(fields.disposer_user_id) || 0,
+        kg_diverted: Number(fields.kg_diverted) || 0,
+        note: fields.note || '',
+      };
+      /* backend wants exactly one parent */
+      if (fields.activity_id) body.activity_id = Number(fields.activity_id);
+      else if (fields.listing_id) body.listing_id = Number(fields.listing_id);
+      const res = syncXHR('POST', '/api/verifications', body, true);
+      if (res) return { ok: true, verification: res };
+    } catch (e) {
+      if (e && e.status && e.status < 500) {
+        return { ok: false, message: (e.body && e.body.error) || 'Could not record the verification.' };
+      }
+      /* 5xx / network — fall through to mock */
+    }
+  }
+  return _mockCreateVerification(fields);
+}
+function _mockCreateVerification(fields = {}) {
+  const id = _verifications.reduce((m, v) => Math.max(m, v.id || 0), 0) + 1;
+  const v = {
+    id,
+    disposer_user_id: fields.disposer_user_id ?? null,
+    verifier_user_id: 1,
+    activity_id: fields.activity_id ?? null,
+    listing_id: fields.listing_id ?? null,
+    kg_diverted: fields.kg_diverted || 0,
+    note: fields.note || '',
+    verified_at: new Date().toISOString(),
+  };
+  _verifications.push(v);
+  saveJSON('dt_verifications', _verifications);
+  if (v.disposer_user_id) {
+    const d = DISPOSERS.find(x => x.user_id === Number(v.disposer_user_id) || x.id === Number(v.disposer_user_id));
+    if (d) { d.cleanups_completed += 1; d.kg_diverted += Number(v.kg_diverted) || 0; }
+  }
+  return { ok: true, verification: v };
+}
+
+/* ============================================================
+   Engagement mock seeds (activities, stories, support requests)
+   Fallback data only: the api* functions above hit the backend
+   first. Field names are snake_case so they match the backend
+   payloads and the renderers can read either source.
+   ============================================================ */
+
+const SEED_ACTIVITIES = [
+  { id: 101, title: "Nyalenda Drain Clearing", description: "Joining hands to clear the stormwater trenches before the rains.", photo_url: "", location: "Kisumu, Nyalenda", target_volume_label: "~120kg", target_kg: 120, event_date: hoursAgo(-72), volunteers_needed: 8, volunteers_pledged: 2, status: "upcoming", needs_disposer: true, created_at: hoursAgo(3), poster_name: "Amina O.", account_type: "individual" },
+  { id: 102, title: "Kibos Road Cleanup", description: "Picking up roadside waste along Kibos Road with the neighbourhood.", photo_url: "", location: "Kisumu, Kibos Road", target_volume_label: "~300kg", target_kg: 300, event_date: hoursAgo(-30), volunteers_needed: 12, volunteers_pledged: 3, status: "active", needs_disposer: false, created_at: hoursAgo(10), poster_name: "Zawadi Works Ltd.", account_type: "organization" },
+];
+
+const SEED_STORIES = [
+  { id: 201, title: "Before & After: Milimani alley", caption: "Cleared and composted.", before_photo_url: "", after_photo_url: "", location: "Kisumu, Milimani", kg_removed: 60, activity_id: null, disposer_user_id: null, disposer_name: "", created_at: hoursAgo(20), poster_name: "Grace W.", account_type: "individual" },
+];
+
+const SEED_SUPPORT_REQUESTS = [
+  { id: 301, activity_id: 101, disposer_id: null, listing_id: null, kind: "bags", item_label: "Heavy-duty trash bags", qty_needed: 10, qty_fulfilled: 3, contact_method: "whatsapp", contact_value: "2547XXXXXXX", created_at: hoursAgo(2) },
+];
+
+let _addedActivities = loadJSON("dumptrade_added_activities", []);
+let _addedStories = loadJSON("dumptrade_added_stories", []);
+let _addedSupportRequests = loadJSON("dumptrade_added_support", []);
+
+let _activities = [..._addedActivities, ...SEED_ACTIVITIES];
+let _stories = [..._addedStories, ...SEED_STORIES];
+let _supportReqs = [..._addedSupportRequests, ...SEED_SUPPORT_REQUESTS];
+
+let _nextActivityId = Math.max(0, ...SEED_ACTIVITIES.map(a => a.id), ..._addedActivities.map(a => a.id)) + 1;
+let _nextStoryId = Math.max(0, ...SEED_STORIES.map(s => s.id), ..._addedStories.map(s => s.id)) + 1;
+let _nextSupportId = Math.max(0, ...SEED_SUPPORT_REQUESTS.map(s => s.id), ..._addedSupportRequests.map(s => s.id)) + 1;
+
+/* ---------- Activities ---------- */
+function apiGetActivities(filters = {}) {
+  if (backendUp()) {
+    try {
+      const path = "/api/activities" + apiQuery({
+        location: filters.location || "",
+        status: (filters.status && filters.status !== "all") ? filters.status : "",
+        search: filters.search || "",
+      });
+      const rows = syncXHR("GET", path, null, false) || [];
+      return rows.map(normalizeActivity);
+    } catch (e) { /* fall through to mock */ }
+  }
+  return _mockGetActivities(filters);
+}
+function _mockGetActivities(filters = {}) {
+  return _activities.filter(a => {
+    if (filters.status && a.status !== filters.status) return false;
+    if (filters.search && !a.title.toLowerCase().includes(filters.search.toLowerCase())) return false;
+    return true;
+  });
+}
+
+function apiGetActivityById(id) {
+  if (backendUp()) {
+    try {
+      const row = syncXHR("GET", "/api/activities/" + encodeURIComponent(id), null, false);
+      if (row && row.id) return normalizeActivity(row);
+    } catch (e) {
+      if (e && e.status === 404) return null;
+      /* else fall through to mock */
+    }
+  }
+  return _mockGetActivityById(id);
+}
+function _mockGetActivityById(id) {
+  return _activities.find(a => a.id === Number(id)) || null;
+}
+
+/* The date input yields "YYYY-MM-DD" but the backend binds a
+   time.Time, so widen it to RFC3339 (and omit it when empty). */
+function _toRFC3339(value) {
+  if (!value) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value + "T09:00:00Z";
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+function apiCreateActivity(fields = {}) {
+  if (backendUp()) {
+    if (!apiHasAuth()) return null;
+    try {
+      const body = {
+        title: fields.title || "",
+        description: fields.description || "",
+        photo_url: fields.photo_url || "",
+        location: fields.location || "",
+        target_volume_label: fields.target_volume_label || "",
+        target_kg: Number(fields.target_kg) || 0,
+        volunteers_needed: Number(fields.volunteers_needed) || 0,
+        needs_disposer: !!fields.needs_disposer,
+      };
+      const when = _toRFC3339(fields.event_date);
+      if (when) body.event_date = when;
+      const row = syncXHR("POST", "/api/activities", body, true);
+      if (row && row.id) return normalizeActivity(row);
+    } catch (e) {
+      if (e && e.status === 401) { apiToast("Please log in first."); return null; }
+      /* else fall through to mock */
+    }
+  }
+  return _mockCreateActivity(fields);
+}
+function _mockCreateActivity(fields = {}) {
+  const activity = {
+    id: _nextActivityId++,
+    description: "",
+    photo_url: "",
+    target_volume_label: "",
+    target_kg: 0,
+    event_date: "",
+    volunteers_needed: 0,
+    volunteers_pledged: 0,
+    status: "upcoming",
+    needs_disposer: false,
+    poster_name: "You",
+    account_type: "individual",
+    created_at: new Date().toISOString(),
+    ...fields,
+  };
+  _addedActivities.unshift(activity);
+  saveJSON("dumptrade_added_activities", _addedActivities);
+  _activities = [..._addedActivities, ...SEED_ACTIVITIES];
+  return activity;
+}
+
+function apiPledgeActivity(id) {
+  if (backendUp()) {
+    if (!apiToken()) return { ok: false, message: "Please log in first." };
+    try {
+      syncXHR("POST", "/api/activities/" + encodeURIComponent(id) + "/pledge", {}, true);
+      return { ok: true, message: "Thanks for pledging — see you there!" };
+    } catch (e) {
+      if (e && e.status && e.status < 500) {
+        return { ok: false, message: (e.body && e.body.error) || "You have already pledged for this one." };
+      }
+      /* 5xx / network — fall through to mock */
+    }
+  }
+  return _mockPledgeActivity(id);
+}
+function _mockPledgeActivity(id) {
+  const a = _mockGetActivityById(id);
+  if (!a) return { ok: false, message: "Activity not found." };
+  a.volunteers_pledged = (a.volunteers_pledged || 0) + 1;
+  const idx = _addedActivities.findIndex(x => x.id === a.id);
+  if (idx !== -1) { _addedActivities[idx] = a; saveJSON("dumptrade_added_activities", _addedActivities); }
+  return { ok: true, message: "Thanks for pledging — see you there!" };
+}
+
+/* ---------- Impact stories ---------- */
+function apiGetStories(filters = {}) {
+  if (backendUp()) {
+    try {
+      const path = "/api/stories" + apiQuery({
+        location: filters.location || "",
+        search: filters.search || "",
+      });
+      const rows = syncXHR("GET", path, null, false) || [];
+      return rows.map(normalizeStory);
+    } catch (e) { /* fall through to mock */ }
+  }
+  return _mockGetStories(filters);
+}
+function _mockGetStories(filters = {}) {
+  return _stories.filter(s => {
+    if (filters.search && !s.title.toLowerCase().includes(filters.search.toLowerCase())) return false;
+    return true;
+  });
+}
+
+function apiGetStoryById(id) {
+  if (backendUp()) {
+    try {
+      const row = syncXHR("GET", "/api/stories/" + encodeURIComponent(id), null, false);
+      if (row && row.id) return normalizeStory(row);
+    } catch (e) {
+      if (e && e.status === 404) return null;
+      /* else fall through to mock */
+    }
+  }
+  return _mockGetStoryById(id);
+}
+function _mockGetStoryById(id) {
+  return _stories.find(s => s.id === Number(id)) || null;
+}
+
+function apiCreateStory(fields = {}) {
+  if (backendUp()) {
+    if (!apiHasAuth()) return null;
+    try {
+      const body = {
+        title: fields.title || "",
+        caption: fields.caption || "",
+        before_photo_url: fields.before_photo_url || "",
+        after_photo_url: fields.after_photo_url || "",
+        location: fields.location || "",
+        kg_removed: Number(fields.kg_removed) || 0,
+      };
+      if (fields.activity_id) body.activity_id = Number(fields.activity_id);
+      if (fields.disposer_user_id) body.disposer_user_id = Number(fields.disposer_user_id);
+      const row = syncXHR("POST", "/api/stories", body, true);
+      if (row && row.id) return normalizeStory(row);
+    } catch (e) {
+      if (e && e.status === 401) { apiToast("Please log in first."); return null; }
+      /* else fall through to mock */
+    }
+  }
+  return _mockCreateStory(fields);
+}
+function _mockCreateStory(fields = {}) {
+  const story = {
+    id: _nextStoryId++,
+    caption: "",
+    before_photo_url: "",
+    after_photo_url: "",
+    location: "",
+    kg_removed: 0,
+    activity_id: null,
+    disposer_user_id: null,
+    disposer_name: "",
+    poster_name: "You",
+    account_type: "individual",
+    created_at: new Date().toISOString(),
+    ...fields,
+  };
+  _addedStories.unshift(story);
+  saveJSON("dumptrade_added_stories", _addedStories);
+  _stories = [..._addedStories, ...SEED_STORIES];
+  return story;
+}
+
+/* ---------- Support requests ---------- */
+function apiGetSupportRequests(filters = {}) {
+  if (backendUp()) {
+    try {
+      const path = "/api/support-requests" + apiQuery({
+        activity_id: filters.activity_id || "",
+        disposer_id: filters.disposer_id || "",
+        listing_id: filters.listing_id || "",
+        kind: filters.kind || "",
+      });
+      const rows = syncXHR("GET", path, null, false) || [];
+      return rows.map(normalizeSupportRequest);
+    } catch (e) { /* fall through to mock */ }
+  }
+  return _mockGetSupportRequests(filters);
+}
+function _mockGetSupportRequests(filters = {}) {
+  return _supportReqs.filter(r => {
+    if (filters.activity_id && r.activity_id !== Number(filters.activity_id)) return false;
+    if (filters.listing_id && r.listing_id !== Number(filters.listing_id)) return false;
+    if (filters.kind && r.kind !== filters.kind) return false;
+    return true;
+  });
+}
+
+function apiCreateSupportRequest(fields = {}) {
+  if (backendUp()) {
+    if (!apiHasAuth()) return null;
+    try {
+      const body = {
+        kind: fields.kind || "other",
+        item_label: fields.item_label || "",
+        qty_needed: Number(fields.qty_needed) || 0,
+        contact_method: fields.contact_method || "dropoff",
+        contact_value: fields.contact_value || "",
+      };
+      /* backend expects exactly one parent */
+      if (fields.activity_id) body.activity_id = Number(fields.activity_id);
+      else if (fields.disposer_id) body.disposer_id = Number(fields.disposer_id);
+      else if (fields.listing_id) body.listing_id = Number(fields.listing_id);
+      const row = syncXHR("POST", "/api/support-requests", body, true);
+      if (row && row.id) return normalizeSupportRequest(row);
+    } catch (e) {
+      if (e && e.status === 401) { apiToast("Please log in first."); return null; }
+      /* else fall through to mock */
+    }
+  }
+  return _mockCreateSupportRequest(fields);
+}
+function _mockCreateSupportRequest(fields = {}) {
+  const req = {
+    id: _nextSupportId++,
+    activity_id: null,
+    disposer_id: null,
+    listing_id: null,
+    kind: "other",
+    item_label: "",
+    qty_needed: 0,
+    qty_fulfilled: 0,
+    contact_method: "dropoff",
+    contact_value: "",
+    created_at: new Date().toISOString(),
+    ...fields,
+  };
+  _addedSupportRequests.unshift(req);
+  saveJSON("dumptrade_added_support", _addedSupportRequests);
+  _supportReqs = [..._addedSupportRequests, ...SEED_SUPPORT_REQUESTS];
+  return req;
+}
+
+/* ---------- Merged feed ---------- */
+function apiGetFeed(limit = 12) {
+  if (backendUp()) {
+    try {
+      const rows = syncXHR("GET", "/api/feed" + apiQuery({ limit }), null, false) || [];
+      return rows.map(normalizeFeedItem);
+    } catch (e) { /* fall through to mock */ }
+  }
+  return _mockGetFeed(limit);
+}
+function _mockGetFeed(limit = 12) {
+  const listings = _mockGetListings({ status: "all" }).map(l => ({
+    kind: "listing", id: l.id, title: l.title, location: l.location,
+    photo_url: l.photoUrl, status: l.status, poster_name: l.posterName,
+    needs_disposer: !!l.needs_disposer, created_at: l.postedAt,
+  }));
+  const activities = _activities.map(a => ({
+    kind: "activity", id: a.id, title: a.title, location: a.location,
+    photo_url: a.photo_url, status: a.status, needs_disposer: !!a.needs_disposer,
+    volunteers_needed: a.volunteers_needed, volunteers_pledged: a.volunteers_pledged,
+    created_at: a.created_at,
+  }));
+  const stories = _stories.map(s => ({
+    kind: "story", id: s.id, title: s.title, location: s.location,
+    before_photo_url: s.before_photo_url, after_photo_url: s.after_photo_url,
+    kg_removed: s.kg_removed, created_at: s.created_at,
+  }));
+  const support = _supportReqs.map(r => {
+    const parent = r.activity_id ? _mockGetActivityById(r.activity_id) : null;
+    const disp = r.listing_id ? _mockGetListingById(r.listing_id) : null;
+    const location = (parent && parent.location) || (disp && disp.location) || "";
+    return {
+      kind: "support", id: r.id, support_kind: r.kind, item_label: r.item_label,
+      qty_needed: r.qty_needed, qty_fulfilled: r.qty_fulfilled, location,
+      contact_method: r.contact_method, contact_value: r.contact_value,
+      created_at: r.created_at,
+    };
+  });
+
+  const merged = [...listings, ...activities, ...stories, ...support];
+  merged.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  return merged.slice(0, limit);
 }

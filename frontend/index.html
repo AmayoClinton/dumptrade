@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DumpTrade &mdash; Give what you don't need</title>
 <link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/engagement.css">
 </head>
 <body>
 
@@ -60,6 +61,21 @@
       <div class="step"><div class="step-num">3</div><h3>Collect</h3><p>Hand it over. Mark it collected &mdash; and it counts toward what didn't get dumped.</p></div>
     </div>
   </section>
+
+  <section class="section">
+    <div class="section-head">
+      <span class="section-eyebrow">04 &mdash; THE FEED</span>
+      <h2>What's moving right now</h2>
+      <a class="btn btn-outline-dark" id="become-disposer-entry" href="become-disposer.html" style="margin-top:12px;display:inline-flex;">Become a disposer</a>
+    </div>
+    <div class="toggle-row feed-tabs" id="feed-tabs">
+      <button class="toggle-btn toggle-active" data-feed="all">All</button>
+      <button class="toggle-btn" data-feed="listing">Claims</button>
+      <button class="toggle-btn" data-feed="activity">Cleanups</button>
+      <button class="toggle-btn" data-feed="support">Support asks</button>
+    </div>
+    <div id="feed-stream"></div>
+  </section>
 </main>
 
 <script src="js/api.js"></script>
@@ -80,5 +96,6 @@
 
   document.getElementById("recent-listings").innerHTML = ticketGridHtml(available.slice(0, 6));
 </script>
+<script src="js/feed.js"></script>
 </body>
 </html>

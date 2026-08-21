@@ -58,6 +58,17 @@ function submitPost() {
     showToast("Please fill in title, quantity label, and location.");
     return;
   }
+
+  // Host the photo if one was chosen; fall back to the local data URL
+  // (offline / mock path) when the upload endpoint is unavailable.
+  let photoUrl = postPhotoDataUrl;
+  const fileInput = document.getElementById("photo-input");
+  const file = fileInput && fileInput.files && fileInput.files[0];
+  if (file && typeof uploadPhoto === "function") {
+    const hosted = uploadPhoto(file);
+    if (hosted) photoUrl = hosted;
+  }
+
   const listing = apiAddListing({
     title,
     category: document.getElementById("f-category").value,
@@ -66,8 +77,12 @@ function submitPost() {
     condition: document.getElementById("f-condition").value.trim() || "Not specified",
     location,
     description: document.getElementById("f-description").value.trim() || "No extra details given.",
-    photoUrl: postPhotoDataUrl,
+    photoUrl: photoUrl,
+    needs_disposer: document.getElementById("needs-disposer-toggle")?.classList.contains("toggle-active") || false,
+    disposer_note: document.getElementById("f-disposer-note")?.value.trim() || "",
   });
+
+  if (!listing) return; // api.js already toasted (e.g. "Please log in first.")
   window.location.href = `listing.html?id=${listing.id}`;
 }
 
